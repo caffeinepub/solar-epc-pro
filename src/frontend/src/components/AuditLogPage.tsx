@@ -32,8 +32,8 @@ export function AuditLogPage() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary/10 rounded-lg">
-          <Shield className="h-5 w-5 text-solar" />
+        <div className="p-2 bg-navy/10 rounded-lg">
+          <Shield className="h-5 w-5 text-navy" />
         </div>
         <div>
           <h1 className="text-2xl font-bold font-display">Audit Log</h1>

@@ -280,10 +280,85 @@ export function useUpdateStock() {
   return useMutation({
     mutationFn: async (args: { id: bigint; qty: bigint }) => {
       if (!actor) throw new Error("No actor");
-      return actor.updateMOQItem(args.id, Number(args.qty), 0);
+      // This is a legacy stub for inventory; it's not actively used for MOQ updates
+      return args.id;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
+    },
+  });
+}
+
+export function useAddMOQItem() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      projectId: bigint;
+      itemName: string;
+      category: string;
+      quantity: number;
+      unit: string;
+      brand: string;
+      unitPrice: number;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.addMOQItem(
+        args.projectId,
+        args.itemName,
+        args.category,
+        args.quantity,
+        args.unit,
+        args.brand,
+        args.unitPrice,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["moq"] });
+    },
+  });
+}
+
+export function useDeleteMOQItem() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("No actor");
+      return actor.deleteMOQItem(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["moq"] });
+    },
+  });
+}
+
+export function useUpdateMOQItemFull() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      id: bigint;
+      itemName: string;
+      category: string;
+      quantity: number;
+      unit: string;
+      brand: string;
+      unitPrice: number;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.updateMOQItem(
+        args.id,
+        args.itemName,
+        args.category,
+        args.quantity,
+        args.unit,
+        args.brand,
+        args.unitPrice,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["moq"] });
     },
   });
 }

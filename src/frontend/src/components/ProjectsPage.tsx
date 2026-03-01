@@ -19,13 +19,10 @@ import { useProjects } from "../hooks/useQueries";
 
 const statusColors: Record<string, string> = {
   [ProjectStatus.draft]: "bg-muted/70 text-muted-foreground border-transparent",
-  [ProjectStatus.quoted]: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  [ProjectStatus.approved]:
-    "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  [ProjectStatus.inProgress]:
-    "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  [ProjectStatus.completed]:
-    "bg-green-500/20 text-green-400 border-green-500/30",
+  [ProjectStatus.quoted]: "bg-navy-light/15 text-navy border-navy-light/30",
+  [ProjectStatus.approved]: "bg-solar/25 text-solar-dark border-solar/40",
+  [ProjectStatus.inProgress]: "bg-orange-100 text-orange-700 border-orange-200",
+  [ProjectStatus.completed]: "bg-green-100 text-green-700 border-green-200",
 };
 
 const statusLabels: Record<string, string> = {
@@ -44,9 +41,9 @@ const installationLabels: Record<string, string> = {
 };
 
 const systemTypeColors: Record<string, string> = {
-  onGrid: "text-green-400",
-  offGrid: "text-amber-400",
-  hybrid: "text-blue-400",
+  onGrid: "text-green-600",
+  offGrid: "text-solar-dark",
+  hybrid: "text-navy-light",
 };
 
 function ProjectCard({
@@ -57,12 +54,12 @@ function ProjectCard({
   onSelect: (id: bigint) => void;
 }) {
   return (
-    <Card className="hover:border-primary/40 transition-all cursor-pointer group">
+    <Card className="hover:border-solar/50 transition-all cursor-pointer group shadow-blue-sm">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold text-sm truncate group-hover:text-solar transition-colors">
+              <h3 className="font-semibold text-sm truncate group-hover:text-navy transition-colors">
                 {project.clientName}
               </h3>
               <Badge
@@ -103,7 +100,7 @@ function ProjectCard({
           <button
             type="button"
             onClick={() => onSelect(project.id)}
-            className="flex-shrink-0 p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-solar transition-colors"
+            className="flex-shrink-0 p-1.5 rounded-md hover:bg-solar/20 text-muted-foreground hover:text-navy transition-colors"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -170,7 +167,7 @@ export function ProjectsPage({
             onClick={() => setStatusFilter("all")}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               statusFilter === "all"
-                ? "bg-primary text-primary-foreground"
+                ? "bg-navy text-white"
                 : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
             }`}
           >
@@ -183,7 +180,7 @@ export function ProjectsPage({
               onClick={() => setStatusFilter(status)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 statusFilter === status
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-navy text-white"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >

@@ -6,11 +6,12 @@ import Array "mo:core/Array";
 import Iter "mo:core/Iter";
 import Bool "mo:core/Bool";
 import List "mo:core/List";
-import Int "mo:core/Int";
 import Nat "mo:core/Nat";
-import Float "mo:core/Float";
 import Order "mo:core/Order";
+import Float "mo:core/Float";
+import Migration "migration";
 
+(with migration = Migration.run)
 actor {
   // Types
   type ProjectStatus = {
@@ -230,17 +231,140 @@ actor {
     moqItems.values().toArray().filter(func(m) { m.projectId == projectId }).sort();
   };
 
-  public shared ({ caller }) func updateMOQItem(id : Nat, quantity : Float, unitPrice : Float) : async () {
+  public shared ({ caller }) func addMOQItem(projectId : Nat, itemName : Text, category : Text, quantity : Float, unit : Text, brand : Text, unitPrice : Float) : async Nat {
+    if (not projects.containsKey(projectId)) {
+      Runtime.trap("Project does not exist");
+    };
+    let id = nextMOQId;
+    nextMOQId += 1;
+    let moq : MOQItem = {
+      id;
+      projectId;
+      itemName;
+      category;
+      quantity;
+      unit;
+      brand;
+      unitPrice;
+      totalPrice = quantity * unitPrice;
+    };
+    moqItems.add(id, moq);
+    id;
+  };
+
+  public shared ({ caller }) func deleteMOQItem(id : Nat) : async () {
+    if (not moqItems.containsKey(id)) {
+      Runtime.trap("MOQ item does not exist");
+    };
+    moqItems.remove(id);
+  };
+
+  public shared ({ caller }) func updateMOQItem(id : Nat, itemName : Text, category : Text, quantity : Float, unit : Text, brand : Text, unitPrice : Float) : async () {
     switch (moqItems.get(id)) {
       case (null) { Runtime.trap("MOQ item does not exist") };
       case (?item) {
         let updatedItem : MOQItem = {
-          item with quantity; unitPrice;
+          item with itemName; category; quantity; unit; brand; unitPrice;
           totalPrice = quantity * unitPrice;
         };
         moqItems.add(id, updatedItem);
       };
     };
+  };
+
+  public shared ({ caller }) func generateMOQ(projectId : Nat) : async () {
+    let project = switch (projects.get(projectId)) {
+      case (null) { Runtime.trap("Project not found") };
+      case (?p) { p };
+    };
+
+    for (item in moqItems.values()) {
+      if (item.projectId == projectId) {
+        moqItems.remove(item.id);
+      };
+    };
+
+    let kw = project.systemSizeKW;
+    let panelQty = Float.ceil(kw * 1000.0 / 540.0);
+    let strings = Float.ceil(panelQty / 8.0);
+
+    let needsBattery = switch (project.systemType) {
+      case (#offGrid) { true };
+      case (#hybrid) { true };
+      case (#onGrid) { false };
+    };
+
+    let battKWh = if (needsBattery) {
+      if (project.batteryCapacityKWh > 0.0) { project.batteryCapacityKWh } else {
+        kw * 2.0;
+      };
+    } else { 0.0 };
+
+    let battQty = if (needsBattery) { Float.ceil(battKWh / 2.4) } else { 0.0 };
+    let dcCableM = strings * 30.0 + 20.0;
+    let inverterPrice = kw * 8000.0;
+
+    let insertItem = func(cat : Text, name : Text, qty : Float, unit : Text, price : Float) {
+      let id = nextMOQId;
+      nextMOQId += 1;
+      moqItems.add(id, {
+        id;
+        projectId;
+        itemName = name;
+        category = cat;
+        quantity = qty;
+        unit;
+        brand = "";
+        unitPrice = price;
+        totalPrice = qty * price;
+      });
+    };
+
+    insertItem("Solar PV", "Solar Panel 540 Wp Mono PERC", panelQty, "Nos", 22000.0);
+    insertItem("Solar PV", "Solar Inverter", 1.0, "Nos", inverterPrice);
+
+    if (needsBattery) {
+      insertItem("Battery Bank", "VRLA Battery 200Ah 12V", battQty, "Nos", 14000.0);
+      insertItem("Battery Bank", "Battery Cable Set", Float.ceil(battQty / 2.0), "Set", 500.0);
+    };
+
+    insertItem("Electrical BoS", "DCDB", 1.0, "Nos", 3500.0);
+    insertItem("Electrical BoS", "ACDB", 1.0, "Nos", 2800.0);
+    insertItem("Electrical BoS", "DC SPD Type II", 2.0, "Nos", 1200.0);
+    insertItem("Electrical BoS", "AC SPD Type II", 1.0, "Nos", 900.0);
+    insertItem("Electrical BoS", "DC MCB 32A", strings + 1.0, "Nos", 350.0);
+    insertItem("Electrical BoS", "AC MCB 63A", 1.0, "Nos", 450.0);
+    insertItem("Electrical BoS", "DC Isolator 1000V", strings, "Nos", 800.0);
+    insertItem("Electrical BoS", "Changeover Switch 63A", 1.0, "Nos", 1200.0);
+    insertItem("Electrical BoS", "Chemical Earthing Kit", 2.0, "Set", 2500.0);
+    insertItem("Electrical BoS", "Lightning Arrester", 1.0, "Nos", 1800.0);
+
+    insertItem("Cabling", "DC Solar Cable 6sqmm Red", Float.ceil(dcCableM / 2.0), "Mtr", 35.0);
+    insertItem("Cabling", "DC Solar Cable 6sqmm Black", Float.ceil(dcCableM / 2.0), "Mtr", 35.0);
+    insertItem("Cabling", "AC Power Cable 4sqmm", 30.0, "Mtr", 28.0);
+    insertItem("Cabling", "Earthing Cable 16sqmm", 20.0, "Mtr", 45.0);
+    insertItem("Cabling", "Conduit Pipe 25mm", Float.ceil(dcCableM / 3.0), "Nos", 85.0);
+    insertItem("Cabling", "Cable Tie Pack 100pcs", 3.0, "Pkt", 120.0);
+    insertItem("Cabling", "MC4 Connector Pair", strings * 2.0 + 4.0, "Pair", 180.0);
+    insertItem("Cabling", "Cable Gland Set", 1.0, "Set", 450.0);
+    insertItem("Cabling", "Ferrules and Markers Set", 1.0, "Set", 280.0);
+
+    switch (project.installationType) {
+      case (#rccRooftop) { insertItem("Mounting Structure", "MS Aluminium Rooftop Structure", panelQty, "Nos", 4000.0) };
+      case (#sheetMetal) { insertItem("Mounting Structure", "GI Roof Hook MS Channel Structure", panelQty, "Nos", 3500.0) };
+      case (#groundMount) { insertItem("Mounting Structure", "MS Ground Mount Structure", panelQty, "Nos", 6500.0) };
+      case (#other) { insertItem("Mounting Structure", "Aluminium Elevated Structure", panelQty, "Nos", 8000.0) };
+    };
+
+    insertItem("Mounting Structure", "Mounting Rail 40x40mm 3m", Float.ceil(panelQty * 2.0 / 3.0), "Nos", 380.0);
+    insertItem("Mounting Structure", "End Clamp Set", panelQty * 2.0, "Nos", 55.0);
+    insertItem("Mounting Structure", "Mid Clamp Set", panelQty, "Nos", 45.0);
+    insertItem("Mounting Structure", "Nut Bolt Washer Set 50pcs", Float.ceil(panelQty / 10.0), "Pkt", 350.0);
+
+    insertItem("Miscellaneous", "Junction Box IP65", strings + 1.0, "Nos", 320.0);
+    insertItem("Miscellaneous", "Warning Label Set", 1.0, "Set", 150.0);
+    insertItem("Miscellaneous", "Danger Board Acrylic", 2.0, "Nos", 220.0);
+    insertItem("Miscellaneous", "Installation Consumables", 1.0, "Set", 850.0);
   };
 
   // Brand functions

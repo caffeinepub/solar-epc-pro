@@ -1,11 +1,20 @@
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 import {
   Battery,
+  ClipboardList,
   FileText,
   FolderOpen,
   LayoutDashboard,
   Menu,
   Package,
+  Settings,
   Shield,
   Sun,
   Users,
@@ -17,9 +26,11 @@ import { AuditLogPage } from "./components/AuditLogPage";
 import { BrandCatalog } from "./components/BrandCatalog";
 import { Dashboard } from "./components/Dashboard";
 import { InventoryPage } from "./components/InventoryPage";
+import { MOQManagerPage } from "./components/MOQManagerPage";
 import { ProjectWizard } from "./components/ProjectWizard";
 import { ProjectsPage } from "./components/ProjectsPage";
 import { QuotationsPage } from "./components/QuotationsPage";
+import { SettingsSheet } from "./components/SettingsSheet";
 import { SiteExecution } from "./components/SiteExecution";
 import { UsersPage } from "./components/UsersPage";
 
@@ -32,7 +43,8 @@ type Page =
   | "execution"
   | "users"
   | "audit"
-  | "quotations";
+  | "quotations"
+  | "moqManager";
 
 const NAV_ITEMS: {
   id: Page;
@@ -44,6 +56,12 @@ const NAV_ITEMS: {
   { id: "projects", label: "Projects", icon: FolderOpen, group: "main" },
   { id: "quotations", label: "Quotations", icon: FileText, group: "main" },
   { id: "inventory", label: "Inventory", icon: Package, group: "operations" },
+  {
+    id: "moqManager",
+    label: "MOQ Manager",
+    icon: ClipboardList,
+    group: "operations",
+  },
   { id: "brands", label: "Brand Catalog", icon: Battery, group: "operations" },
   { id: "execution", label: "Site Execution", icon: Zap, group: "operations" },
   { id: "users", label: "Users", icon: Users, group: "admin" },
@@ -75,15 +93,15 @@ function Sidebar({
     >
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-3 py-4 border-b border-sidebar-border">
-        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-          <Sun className="h-4 w-4 text-primary-foreground" />
+        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-solar flex items-center justify-center shadow-yellow-glow">
+          <Sun className="h-4 w-4 text-navy" />
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="text-sm font-bold text-sidebar-foreground leading-tight truncate">
+            <p className="text-sm font-bold text-sidebar-foreground leading-tight truncate font-display">
               Solar EPC Pro
             </p>
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-xs text-sidebar-foreground/50 truncate">
               v2.0 Platform
             </p>
           </div>
@@ -97,7 +115,7 @@ function Sidebar({
           return (
             <div key={group.id}>
               {!collapsed && (
-                <p className="px-3 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <p className="px-3 mb-1 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
                   {group.label}
                 </p>
               )}
@@ -114,14 +132,14 @@ function Sidebar({
                         transition-all duration-150
                         ${
                           active
-                            ? "bg-sidebar-accent text-solar border-l-2 border-primary -ml-0.5 pl-2.5"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                            ? "bg-solar text-navy font-semibold shadow-yellow-glow"
+                            : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         }
                       `}
                       title={collapsed ? item.label : undefined}
                     >
                       <item.icon
-                        className={`h-4 w-4 flex-shrink-0 ${active ? "text-solar" : "text-muted-foreground"}`}
+                        className={`h-4 w-4 flex-shrink-0 ${active ? "text-navy" : "text-sidebar-foreground/50"}`}
                       />
                       {!collapsed && (
                         <span className="truncate">{item.label}</span>
@@ -138,7 +156,7 @@ function Sidebar({
       {/* Footer */}
       {!collapsed && (
         <div className="p-3 border-t border-sidebar-border">
-          <p className="text-xs text-muted-foreground text-center leading-relaxed">
+          <p className="text-xs text-sidebar-foreground/40 text-center leading-relaxed">
             © {new Date().getFullYear()}.{" "}
             <a
               href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
@@ -162,6 +180,15 @@ export default function App() {
   const [_selectedProjectId, setSelectedProjectId] = useState<bigint | null>(
     null,
   );
+  const [activeRole, setActiveRole] = useState<string>(() => {
+    return localStorage.getItem("solarEpcActiveRole") ?? "owner";
+  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const handleRoleChange = (role: string) => {
+    localStorage.setItem("solarEpcActiveRole", role);
+    setActiveRole(role);
+  };
 
   const navigate = (p: string) => {
     setPage(p as Page);
@@ -191,6 +218,8 @@ export default function App() {
         return <ProjectWizard onComplete={() => setPage("projects")} />;
       case "inventory":
         return <InventoryPage />;
+      case "moqManager":
+        return <MOQManagerPage />;
       case "brands":
         return <BrandCatalog />;
       case "execution":
@@ -200,7 +229,7 @@ export default function App() {
       case "audit":
         return <AuditLogPage />;
       case "quotations":
-        return <QuotationsPage />;
+        return <QuotationsPage activeRole={activeRole} />;
       default:
         return <Dashboard onNavigate={navigate} />;
     }
@@ -245,12 +274,12 @@ export default function App() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card flex-shrink-0">
+        <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-accent/30 flex-shrink-0 shadow-xs">
           {/* Mobile menu button */}
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="md:hidden text-muted-foreground hover:text-foreground"
+            className="md:hidden text-muted-foreground hover:text-navy transition-colors"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -259,36 +288,73 @@ export default function App() {
           <button
             type="button"
             onClick={() => setSidebarCollapsed((v) => !v)}
-            className="hidden md:block text-muted-foreground hover:text-foreground transition-colors"
+            className="hidden md:block text-muted-foreground hover:text-navy transition-colors"
           >
             <Menu className="h-5 w-5" />
           </button>
 
           {/* Page title */}
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold text-foreground truncate capitalize">
+            <h2 className="text-sm font-semibold text-foreground truncate capitalize font-display">
               {page === "wizard"
                 ? "New Project Wizard"
                 : (NAV_ITEMS.find((n) => n.id === page)?.label ?? "Dashboard")}
             </h2>
           </div>
 
+          {/* Role selector */}
+          <Select value={activeRole} onValueChange={handleRoleChange}>
+            <SelectTrigger className="w-36 h-8 text-xs border-border bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="owner" className="text-xs">
+                Owner
+              </SelectItem>
+              <SelectItem value="admin" className="text-xs">
+                Admin
+              </SelectItem>
+              <SelectItem value="procurement" className="text-xs">
+                Procurement
+              </SelectItem>
+              <SelectItem value="siteEngineer" className="text-xs">
+                Site Engineer
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Gear / Settings icon (owner only) */}
+          {activeRole === "owner" && (
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-navy hover:bg-secondary transition-colors"
+              title="Company Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+          )}
+
           {/* Solar EPC badge */}
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20">
-            <Sun className="h-3.5 w-3.5 text-solar" />
-            <span className="text-xs font-medium text-solar hidden sm:block">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-solar shadow-yellow-glow border border-solar/50">
+            <Sun className="h-3.5 w-3.5 text-navy" />
+            <span className="text-xs font-bold text-navy hidden sm:block">
               Solar EPC Pro
             </span>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-background">
           {renderPage()}
         </main>
       </div>
 
       <Toaster richColors />
+      <SettingsSheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   );
 }

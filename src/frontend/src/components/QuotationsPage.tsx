@@ -9,15 +9,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileText, Leaf, TrendingUp } from "lucide-react";
+import { Building2, FileText, Leaf, TrendingUp } from "lucide-react";
 import { QuotationStatus } from "../backend.d";
+import { useCompanyProfile } from "../hooks/useCompanyProfile";
 import { useQuotations } from "../hooks/useQueries";
 
 const statusColors: Record<string, string> = {
   [QuotationStatus.draft]: "bg-muted text-muted-foreground",
-  [QuotationStatus.sent]: "bg-blue-500/20 text-blue-400",
-  [QuotationStatus.accepted]: "bg-green-500/20 text-green-400",
-  [QuotationStatus.rejected]: "bg-destructive/20 text-red-400",
+  [QuotationStatus.sent]:
+    "bg-navy-light/15 text-navy border border-navy-light/30",
+  [QuotationStatus.accepted]:
+    "bg-green-100 text-green-700 border border-green-200",
+  [QuotationStatus.rejected]:
+    "bg-destructive/10 text-red-600 border border-red-200",
 };
 
 const statusLabels: Record<string, string> = {
@@ -27,8 +31,21 @@ const statusLabels: Record<string, string> = {
   [QuotationStatus.rejected]: "Rejected",
 };
 
-export function QuotationsPage() {
+interface QuotationsPageProps {
+  activeRole?: string;
+}
+
+export function QuotationsPage({
+  activeRole: _activeRole,
+}: QuotationsPageProps) {
   const { data: quotations, isLoading } = useQuotations();
+  const { profile } = useCompanyProfile();
+
+  const hasCompanyProfile =
+    profile.companyName ||
+    profile.companyAddress ||
+    profile.gstNumber ||
+    profile.logoBase64;
 
   const totalValue = quotations?.reduce((sum, q) => sum + q.totalCost, 0) ?? 0;
   const acceptedCount =
@@ -42,6 +59,63 @@ export function QuotationsPage() {
 
   return (
     <div className="space-y-5">
+      {/* Company letterhead banner */}
+      <Card className="border border-border shadow-sm">
+        <CardContent className="p-4">
+          {hasCompanyProfile ? (
+            <div className="flex items-start gap-4">
+              {/* Logo */}
+              {profile.logoBase64 ? (
+                <div className="flex-shrink-0">
+                  <img
+                    src={profile.logoBase64}
+                    alt="Company logo"
+                    className="h-12 w-auto object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-navy/10 flex items-center justify-center">
+                  <Building2 className="h-6 w-6 text-navy/40" />
+                </div>
+              )}
+              {/* Company info */}
+              <div className="flex-1 min-w-0">
+                {profile.companyName && (
+                  <p className="text-base font-bold text-navy leading-tight font-display">
+                    {profile.companyName}
+                  </p>
+                )}
+                {profile.companyAddress && (
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    {profile.companyAddress}
+                  </p>
+                )}
+                {profile.gstNumber && (
+                  <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                    GSTIN: {profile.gstNumber}
+                  </p>
+                )}
+              </div>
+              <div className="flex-shrink-0 text-right">
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-solar/20 border border-solar/40">
+                  <span className="text-xs font-semibold text-solar-dark">
+                    Quotation Header
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <Building2 className="h-5 w-5 opacity-50 flex-shrink-0" />
+              <p className="text-sm">
+                Set company details in Settings (gear icon, owner only) to
+                auto-populate quotation headers.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold font-display">Quotations</h1>
@@ -55,12 +129,12 @@ export function QuotationsPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <FileText className="h-4 w-4 text-solar" />
+              <FileText className="h-4 w-4 text-navy" />
               <p className="text-xs text-muted-foreground uppercase tracking-wider">
                 Total Pipeline
               </p>
             </div>
-            <p className="text-xl font-bold text-solar">
+            <p className="text-xl font-bold text-navy font-display">
               ₹{(totalValue / 100000).toFixed(1)}L
             </p>
           </CardContent>
@@ -68,18 +142,18 @@ export function QuotationsPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="h-4 w-4 text-green-400" />
+              <TrendingUp className="h-4 w-4 text-green-600" />
               <p className="text-xs text-muted-foreground uppercase tracking-wider">
                 Accepted
               </p>
             </div>
-            <p className="text-xl font-bold text-green-400">{acceptedCount}</p>
+            <p className="text-xl font-bold text-green-600">{acceptedCount}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <Leaf className="h-4 w-4 text-emerald-400" />
+              <Leaf className="h-4 w-4 text-solar-dark" />
               <p className="text-xs text-muted-foreground uppercase tracking-wider">
                 Avg Payback
               </p>
@@ -136,10 +210,10 @@ export function QuotationsPage() {
                     <TableCell className="text-sm text-muted-foreground">
                       {q.companyName}
                     </TableCell>
-                    <TableCell className="text-right font-semibold text-solar">
+                    <TableCell className="text-right font-semibold text-navy">
                       ₹{q.totalCost.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right text-sm text-green-400">
+                    <TableCell className="text-right text-sm text-green-600">
                       ₹{q.annualSavings.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right text-sm">

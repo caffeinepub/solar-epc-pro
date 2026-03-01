@@ -79,10 +79,10 @@ function ProjectExecutionCard({
           <Badge
             className={
               project.status === ProjectStatus.completed
-                ? "bg-green-500/20 text-green-400"
+                ? "bg-green-100 text-green-700 border border-green-200"
                 : project.status === ProjectStatus.inProgress
-                  ? "bg-orange-500/20 text-orange-400"
-                  : "bg-amber-500/20 text-amber-400"
+                  ? "bg-orange-100 text-orange-700 border border-orange-200"
+                  : "bg-solar/25 text-solar-dark border border-solar/40"
             }
           >
             {project.status === ProjectStatus.inProgress
@@ -103,7 +103,7 @@ function ProjectExecutionCard({
           </div>
           <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
             <div
-              className="h-full bg-primary rounded-full transition-all"
+              className="h-full bg-navy rounded-full transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -122,7 +122,7 @@ function ProjectExecutionCard({
                 }`}
               >
                 {done ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-400 flex-shrink-0" />
+                  <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
                 ) : (
                   <Circle className="h-4 w-4 flex-shrink-0" />
                 )}

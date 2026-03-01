@@ -104,6 +104,10 @@ export interface _SERVICE {
     bigint
   >,
   'addAuditEntry' : ActorMethod<[string, bigint, string, string], undefined>,
+  'addMOQItem' : ActorMethod<
+    [bigint, string, string, number, string, string, number],
+    bigint
+  >,
   'createBrand' : ActorMethod<[string, string, boolean], bigint>,
   'createInventoryItem' : ActorMethod<
     [string, string, string, bigint, bigint, string, string],
@@ -144,6 +148,8 @@ export interface _SERVICE {
     bigint
   >,
   'createUser' : ActorMethod<[string, string, UserRole, boolean], bigint>,
+  'deleteMOQItem' : ActorMethod<[bigint], undefined>,
+  'generateMOQ' : ActorMethod<[bigint], undefined>,
   'getAuditLog' : ActorMethod<[], Array<AuditEntry>>,
   'listBrands' : ActorMethod<[], Array<Brand>>,
   'listInventory' : ActorMethod<[], Array<InventoryItem>>,
@@ -151,7 +157,10 @@ export interface _SERVICE {
   'listProjects' : ActorMethod<[], Array<Project>>,
   'listQuotations' : ActorMethod<[], Array<Quotation>>,
   'listUsers' : ActorMethod<[], Array<User>>,
-  'updateMOQItem' : ActorMethod<[bigint, number, number], undefined>,
+  'updateMOQItem' : ActorMethod<
+    [bigint, string, string, number, string, string, number],
+    undefined
+  >,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

@@ -15,6 +15,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ['"Bricolage Grotesque"', "ui-sans-serif", "system-ui", "sans-serif"],
+        body: ['"Plus Jakarta Sans"', "ui-sans-serif", "system-ui", "sans-serif"],
+      },
       colors: {
         border: "oklch(var(--border))",
         input: "oklch(var(--input))",
@@ -66,6 +70,18 @@ export default {
           border: "oklch(var(--sidebar-border))",
           ring: "oklch(var(--sidebar-ring))",
         },
+        /* Solar yellow token */
+        solar: {
+          DEFAULT: "oklch(0.88 0.19 88)",
+          dark: "oklch(0.72 0.19 88)",
+          light: "oklch(0.95 0.08 88)",
+        },
+        /* Navy blue token */
+        navy: {
+          DEFAULT: "oklch(0.22 0.07 260)",
+          light: "oklch(0.35 0.14 255)",
+          muted: "oklch(0.30 0.09 260)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -74,6 +90,8 @@ export default {
       },
       boxShadow: {
         xs: "0 1px 2px 0 rgba(0,0,0,0.05)",
+        "blue-sm": "0 2px 8px 0 oklch(0.22 0.07 260 / 0.12)",
+        "yellow-glow": "0 0 20px oklch(0.88 0.19 88 / 0.3)",
       },
       keyframes: {
         "accordion-down": {

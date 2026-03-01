@@ -34,10 +34,12 @@ import { toast } from "sonner";
 import { UserRole, useCreateUser, useUsers } from "../hooks/useQueries";
 
 const roleColors: Record<string, string> = {
-  [UserRole.owner]: "bg-amber-500/20 text-amber-400",
-  [UserRole.admin]: "bg-blue-500/20 text-blue-400",
-  [UserRole.procurement]: "bg-purple-500/20 text-purple-400",
-  [UserRole.siteEngineer]: "bg-green-500/20 text-green-400",
+  [UserRole.owner]: "bg-solar/25 text-solar-dark border border-solar/40",
+  [UserRole.admin]: "bg-navy-light/15 text-navy border border-navy-light/30",
+  [UserRole.procurement]:
+    "bg-purple-100 text-purple-700 border border-purple-200",
+  [UserRole.siteEngineer]:
+    "bg-green-100 text-green-700 border border-green-200",
 };
 
 const roleLabels: Record<string, string> = {
@@ -233,7 +235,7 @@ export function UsersPage() {
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-primary/20 text-solar text-xs font-bold">
+                          <AvatarFallback className="bg-solar text-navy text-xs font-bold">
                             {getInitials(user.name)}
                           </AvatarFallback>
                         </Avatar>
@@ -252,7 +254,7 @@ export function UsersPage() {
                       <Badge
                         className={
                           user.isActive
-                            ? "bg-green-500/20 text-green-400 text-xs"
+                            ? "bg-green-100 text-green-700 text-xs border border-green-200"
                             : "bg-muted text-muted-foreground text-xs"
                         }
                       >

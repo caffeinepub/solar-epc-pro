@@ -113,11 +113,14 @@ export enum Variant_sheetMetal_rccRooftop_other_groundMount {
 export interface backendInterface {
     addAppliance(projectId: bigint, name: string, wattage: number, surgeFactor: number, dailyHours: number, quantity: bigint): Promise<bigint>;
     addAuditEntry(action: string, performedBy: bigint, targetEntity: string, details: string): Promise<void>;
+    addMOQItem(projectId: bigint, itemName: string, category: string, quantity: number, unit: string, brand: string, unitPrice: number): Promise<bigint>;
     createBrand(category: string, name: string, isActive: boolean): Promise<bigint>;
     createInventoryItem(sku: string, name: string, category: string, quantityOnHand: bigint, minStock: bigint, unit: string, warehouseLocation: string): Promise<bigint>;
     createProject(clientName: string, systemType: Variant_hybrid_offGrid_onGrid, installationType: Variant_sheetMetal_rccRooftop_other_groundMount, loadInputMethod: Variant_applianceBased_consumptionBased, systemSizeKW: number, batteryCapacityKWh: number): Promise<bigint>;
     createQuotation(proposalNumber: string, clientName: string, companyName: string, gst: number, totalCost: number, subsidy: number, paybackYears: number, annualSavings: number, irr: number, carbonSavings: number, status: QuotationStatus, termsAndConditions: string): Promise<bigint>;
     createUser(name: string, email: string, role: UserRole, isActive: boolean): Promise<bigint>;
+    deleteMOQItem(id: bigint): Promise<void>;
+    generateMOQ(projectId: bigint): Promise<void>;
     getAuditLog(): Promise<Array<AuditEntry>>;
     listBrands(): Promise<Array<Brand>>;
     listInventory(): Promise<Array<InventoryItem>>;
@@ -125,5 +128,5 @@ export interface backendInterface {
     listProjects(): Promise<Array<Project>>;
     listQuotations(): Promise<Array<Quotation>>;
     listUsers(): Promise<Array<User>>;
-    updateMOQItem(id: bigint, quantity: number, unitPrice: number): Promise<void>;
+    updateMOQItem(id: bigint, itemName: string, category: string, quantity: number, unit: string, brand: string, unitPrice: number): Promise<void>;
 }

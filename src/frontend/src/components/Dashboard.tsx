@@ -21,10 +21,14 @@ import {
 
 const statusColors: Record<string, string> = {
   [ProjectStatus.draft]: "bg-muted text-muted-foreground",
-  [ProjectStatus.quoted]: "bg-blue-500/20 text-blue-400",
-  [ProjectStatus.approved]: "bg-amber-500/20 text-amber-400",
-  [ProjectStatus.inProgress]: "bg-orange-500/20 text-orange-400",
-  [ProjectStatus.completed]: "bg-green-500/20 text-green-400",
+  [ProjectStatus.quoted]:
+    "bg-navy-light/15 text-navy-light border border-navy-light/30",
+  [ProjectStatus.approved]:
+    "bg-solar/20 text-solar-dark border border-solar/30",
+  [ProjectStatus.inProgress]:
+    "bg-orange-100 text-orange-700 border border-orange-200",
+  [ProjectStatus.completed]:
+    "bg-green-100 text-green-700 border border-green-200",
 };
 
 const statusLabels: Record<string, string> = {
@@ -50,7 +54,7 @@ function StatCard({
 }) {
   return (
     <Card
-      className={`relative overflow-hidden ${accent ? "solar-border border" : ""}`}
+      className={`relative overflow-hidden border shadow-blue-sm ${accent ? "border-solar/40" : "border-border"}`}
     >
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
@@ -59,22 +63,22 @@ function StatCard({
               {label}
             </p>
             <p
-              className={`text-3xl font-bold font-display ${accent ? "text-solar" : "text-foreground"}`}
+              className={`text-3xl font-bold font-display ${accent ? "text-navy" : "text-foreground"}`}
             >
               {value}
             </p>
             {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
           </div>
           <div
-            className={`p-2.5 rounded-lg ${accent ? "bg-primary/20" : "bg-secondary"}`}
+            className={`p-2.5 rounded-lg ${accent ? "bg-solar shadow-yellow-glow" : "bg-secondary"}`}
           >
             <Icon
-              className={`h-5 w-5 ${accent ? "text-solar" : "text-muted-foreground"}`}
+              className={`h-5 w-5 ${accent ? "text-navy" : "text-muted-foreground"}`}
             />
           </div>
         </div>
         {accent && (
-          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent opacity-60" />
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-solar/0 via-solar to-solar/0" />
         )}
       </CardContent>
     </Card>
@@ -109,11 +113,11 @@ export function Dashboard({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary/20 rounded-lg">
-          <Sun className="h-6 w-6 text-solar" />
+        <div className="p-2 bg-solar rounded-lg shadow-yellow-glow">
+          <Sun className="h-6 w-6 text-navy" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold font-display">
+          <h1 className="text-2xl font-bold font-display text-navy">
             Operations Dashboard
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -169,7 +173,7 @@ export function Dashboard({
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Activity className="h-4 w-4 text-solar" />
+              <Activity className="h-4 w-4 text-navy" />
               Project Status Breakdown
             </CardTitle>
           </CardHeader>
@@ -200,7 +204,7 @@ export function Dashboard({
                     <div className="flex items-center gap-3">
                       <div className="w-24 h-1.5 bg-secondary rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-primary rounded-full transition-all"
+                          className="h-full bg-navy rounded-full transition-all"
                           style={{
                             width: totalProjects
                               ? `${(count / totalProjects) * 100}%`
@@ -223,7 +227,7 @@ export function Dashboard({
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-400" />
+              <AlertTriangle className="h-4 w-4 text-orange-500" />
               Low Stock Alerts
             </CardTitle>
           </CardHeader>
@@ -266,7 +270,7 @@ export function Dashboard({
                   <button
                     type="button"
                     onClick={() => onNavigate("inventory")}
-                    className="w-full text-xs text-solar hover:underline text-center pt-1"
+                    className="w-full text-xs text-navy hover:underline text-center pt-1"
                   >
                     View all {lowStockItems.length} alerts →
                   </button>
@@ -281,7 +285,7 @@ export function Dashboard({
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-solar" />
+            <TrendingUp className="h-4 w-4 text-navy" />
             Recent Activity
           </CardTitle>
         </CardHeader>
@@ -298,7 +302,7 @@ export function Dashboard({
                   key={entry.id.toString()}
                   className="flex items-start gap-3 p-2.5 rounded-md hover:bg-secondary/30"
                 >
-                  <div className="w-1.5 h-1.5 rounded-full bg-solar mt-2 flex-shrink-0" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-navy mt-2 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
                       {entry.action}
@@ -331,9 +335,9 @@ export function Dashboard({
             type="button"
             key={page}
             onClick={() => onNavigate(page)}
-            className="flex items-center gap-2.5 p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left group"
+            className="flex items-center gap-2.5 p-3 rounded-lg border border-border hover:border-solar/60 hover:bg-solar/10 transition-all text-left group"
           >
-            <Icon className="h-4 w-4 text-muted-foreground group-hover:text-solar transition-colors" />
+            <Icon className="h-4 w-4 text-muted-foreground group-hover:text-navy transition-colors" />
             <span className="text-sm font-medium">{label}</span>
           </button>
         ))}

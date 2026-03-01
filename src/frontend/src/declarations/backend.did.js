@@ -116,6 +116,19 @@ export const idlService = IDL.Service({
       [],
     ),
   'addAuditEntry' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text, IDL.Text], [], []),
+  'addMOQItem' : IDL.Func(
+      [
+        IDL.Nat,
+        IDL.Text,
+        IDL.Text,
+        IDL.Float64,
+        IDL.Text,
+        IDL.Text,
+        IDL.Float64,
+      ],
+      [IDL.Nat],
+      [],
+    ),
   'createBrand' : IDL.Func([IDL.Text, IDL.Text, IDL.Bool], [IDL.Nat], []),
   'createInventoryItem' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Nat, IDL.Text, IDL.Text],
@@ -169,6 +182,8 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'deleteMOQItem' : IDL.Func([IDL.Nat], [], []),
+  'generateMOQ' : IDL.Func([IDL.Nat], [], []),
   'getAuditLog' : IDL.Func([], [IDL.Vec(AuditEntry)], []),
   'listBrands' : IDL.Func([], [IDL.Vec(Brand)], ['query']),
   'listInventory' : IDL.Func([], [IDL.Vec(InventoryItem)], ['query']),
@@ -176,7 +191,19 @@ export const idlService = IDL.Service({
   'listProjects' : IDL.Func([], [IDL.Vec(Project)], ['query']),
   'listQuotations' : IDL.Func([], [IDL.Vec(Quotation)], ['query']),
   'listUsers' : IDL.Func([], [IDL.Vec(User)], ['query']),
-  'updateMOQItem' : IDL.Func([IDL.Nat, IDL.Float64, IDL.Float64], [], []),
+  'updateMOQItem' : IDL.Func(
+      [
+        IDL.Nat,
+        IDL.Text,
+        IDL.Text,
+        IDL.Float64,
+        IDL.Text,
+        IDL.Text,
+        IDL.Float64,
+      ],
+      [],
+      [],
+    ),
 });
 
 export const idlInitArgs = [];
@@ -290,6 +317,19 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'addAuditEntry' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text, IDL.Text], [], []),
+    'addMOQItem' : IDL.Func(
+        [
+          IDL.Nat,
+          IDL.Text,
+          IDL.Text,
+          IDL.Float64,
+          IDL.Text,
+          IDL.Text,
+          IDL.Float64,
+        ],
+        [IDL.Nat],
+        [],
+      ),
     'createBrand' : IDL.Func([IDL.Text, IDL.Text, IDL.Bool], [IDL.Nat], []),
     'createInventoryItem' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Nat, IDL.Text, IDL.Text],
@@ -343,6 +383,8 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'deleteMOQItem' : IDL.Func([IDL.Nat], [], []),
+    'generateMOQ' : IDL.Func([IDL.Nat], [], []),
     'getAuditLog' : IDL.Func([], [IDL.Vec(AuditEntry)], []),
     'listBrands' : IDL.Func([], [IDL.Vec(Brand)], ['query']),
     'listInventory' : IDL.Func([], [IDL.Vec(InventoryItem)], ['query']),
@@ -350,7 +392,19 @@ export const idlFactory = ({ IDL }) => {
     'listProjects' : IDL.Func([], [IDL.Vec(Project)], ['query']),
     'listQuotations' : IDL.Func([], [IDL.Vec(Quotation)], ['query']),
     'listUsers' : IDL.Func([], [IDL.Vec(User)], ['query']),
-    'updateMOQItem' : IDL.Func([IDL.Nat, IDL.Float64, IDL.Float64], [], []),
+    'updateMOQItem' : IDL.Func(
+        [
+          IDL.Nat,
+          IDL.Text,
+          IDL.Text,
+          IDL.Float64,
+          IDL.Text,
+          IDL.Text,
+          IDL.Float64,
+        ],
+        [],
+        [],
+      ),
   });
 };
 

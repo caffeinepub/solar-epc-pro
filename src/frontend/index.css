@@ -3,17 +3,17 @@
 @tailwind utilities;
 
 @font-face {
-  font-family: "Mona Sans";
-  src: url("/assets/fonts/MonaSans[wdth,wght].woff2") format("woff2-variations");
-  font-weight: 200 900;
+  font-family: "Bricolage Grotesque";
+  src: url("/assets/fonts/BricolageGrotesque[opsz,wdth,wght].woff2") format("woff2-variations");
+  font-weight: 200 800;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Satoshi";
-  src: url("/assets/fonts/Satoshi[wght].woff2") format("woff2-variations");
-  font-weight: 300 900;
+  font-family: "Plus Jakarta Sans";
+  src: url("/assets/fonts/PlusJakartaSans[wght].woff2") format("woff2-variations");
+  font-weight: 200 800;
   font-style: normal;
   font-display: swap;
 }
@@ -22,63 +22,60 @@
   :root {
     --radius: 0.5rem;
 
-    /* Solar EPC Pro — Warm Industrial Dark Theme */
-    --background: 0.14 0.008 60;
-    --foreground: 0.94 0.012 70;
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       Solar EPC Pro — Blue & Yellow Light Theme
+       Blue = deep navy authority  |  Yellow = solar energy accent
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
-    --card: 0.18 0.01 58;
-    --card-foreground: 0.94 0.012 70;
+    /* Background: warm solar yellow tint */
+    --background: 0.96 0.055 88;
+    --foreground: 0.15 0.04 258;
 
-    --popover: 0.2 0.012 56;
-    --popover-foreground: 0.94 0.012 70;
+    /* Cards: bright white with slight yellow warmth */
+    --card: 0.99 0.018 88;
+    --card-foreground: 0.15 0.04 258;
 
-    /* Solar amber/orange primary */
-    --primary: 0.72 0.18 55;
-    --primary-foreground: 0.12 0.006 58;
+    --popover: 0.99 0.018 88;
+    --popover-foreground: 0.15 0.04 258;
 
-    --secondary: 0.22 0.012 58;
-    --secondary-foreground: 0.88 0.012 70;
+    /* Primary: rich royal blue */
+    --primary: 0.32 0.16 258;
+    --primary-foreground: 0.98 0.005 88;
 
-    --muted: 0.2 0.008 58;
-    --muted-foreground: 0.58 0.02 65;
+    /* Secondary: sky-blue tint */
+    --secondary: 0.90 0.04 240;
+    --secondary-foreground: 0.25 0.10 258;
 
-    --accent: 0.68 0.19 52;
-    --accent-foreground: 0.12 0.006 58;
+    --muted: 0.93 0.03 88;
+    --muted-foreground: 0.48 0.06 258;
 
-    --destructive: 0.58 0.22 25;
-    --destructive-foreground: 0.98 0.005 70;
+    /* Accent: vivid solar yellow */
+    --accent: 0.87 0.20 88;
+    --accent-foreground: 0.12 0.04 60;
 
-    --border: 0.28 0.012 58;
-    --input: 0.22 0.01 58;
-    --ring: 0.72 0.18 55;
+    --destructive: 0.55 0.22 25;
+    --destructive-foreground: 0.98 0.005 90;
+
+    --border: 0.86 0.06 88;
+    --input: 0.94 0.03 88;
+    --ring: 0.32 0.16 258;
 
     /* Chart colors */
-    --chart-1: 0.72 0.18 55;
-    --chart-2: 0.68 0.15 195;
-    --chart-3: 0.62 0.16 145;
-    --chart-4: 0.64 0.2 35;
-    --chart-5: 0.58 0.18 280;
+    --chart-1: 0.87 0.20 88;
+    --chart-2: 0.32 0.16 258;
+    --chart-3: 0.55 0.16 145;
+    --chart-4: 0.65 0.18 35;
+    --chart-5: 0.58 0.16 280;
 
-    /* Sidebar — deeper dark */
-    --sidebar: 0.11 0.008 62;
-    --sidebar-foreground: 0.88 0.012 70;
-    --sidebar-primary: 0.72 0.18 55;
-    --sidebar-primary-foreground: 0.12 0.006 58;
-    --sidebar-accent: 0.17 0.01 58;
-    --sidebar-accent-foreground: 0.88 0.012 70;
-    --sidebar-border: 0.22 0.01 58;
-    --sidebar-ring: 0.72 0.18 55;
-
-    /* Custom tokens */
-    --solar-amber: 0.72 0.18 55;
-    --solar-amber-bright: 0.78 0.2 60;
-    --solar-amber-muted: 0.58 0.14 55;
-    --success: 0.62 0.16 145;
-    --success-foreground: 0.12 0.006 58;
-    --warning: 0.72 0.18 80;
-    --warning-foreground: 0.12 0.006 58;
-    --info: 0.64 0.16 220;
-    --info-foreground: 0.12 0.006 58;
+    /* Sidebar — deep navy blue */
+    --sidebar: 0.20 0.09 258;
+    --sidebar-foreground: 0.95 0.02 88;
+    --sidebar-primary: 0.87 0.20 88;
+    --sidebar-primary-foreground: 0.12 0.04 60;
+    --sidebar-accent: 0.28 0.11 258;
+    --sidebar-accent-foreground: 0.97 0.01 88;
+    --sidebar-border: 0.28 0.07 258;
+    --sidebar-ring: 0.87 0.20 88;
   }
 
   * {
@@ -87,32 +84,57 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: "Satoshi", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: "Mona Sans", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
     font-variation-settings: "wdth" 100;
   }
 }
 
 @layer utilities {
-  .solar-glow {
-    box-shadow: 0 0 20px oklch(0.72 0.18 55 / 0.25);
-  }
-  .solar-border {
-    border-color: oklch(0.72 0.18 55 / 0.4);
-  }
+  /* Solar yellow utilities */
   .text-solar {
-    color: oklch(0.72 0.18 55);
+    color: oklch(0.72 0.19 88);
   }
   .bg-solar {
-    background-color: oklch(0.72 0.18 55);
+    background-color: oklch(0.88 0.19 88);
   }
+  .solar-glow {
+    box-shadow: 0 0 24px oklch(0.88 0.19 88 / 0.35);
+  }
+  .solar-border {
+    border-color: oklch(0.88 0.19 88 / 0.5);
+  }
+
+  /* Navy blue utilities */
+  .text-navy {
+    color: oklch(0.22 0.07 260);
+  }
+  .bg-navy {
+    background-color: oklch(0.22 0.07 260);
+  }
+
+  /* Active sidebar item */
   .sidebar-item-active {
-    background-color: oklch(0.17 0.01 58);
-    border-left: 2px solid oklch(0.72 0.18 55);
+    background-color: oklch(0.3 0.09 260);
+    border-left: 2px solid oklch(0.88 0.19 88);
+  }
+
+  /* Yellow gradient background for main area header */
+  .yellow-gradient-header {
+    background: linear-gradient(
+      135deg,
+      oklch(0.96 0.035 90) 0%,
+      oklch(0.98 0.015 90) 100%
+    );
+  }
+
+  /* Card with yellow accent bottom bar */
+  .card-yellow-accent {
+    border-bottom: 3px solid oklch(0.88 0.19 88);
   }
 }

@@ -144,6 +144,9 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
   // Step 3 — generated project
   const [projectId, setProjectId] = useState<bigint | null>(null);
   const { data: moqItems, isLoading: moqLoading } = useMOQ(projectId);
+  const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>(
+    {},
+  );
 
   // Step 4 — brand selection
   const { data: brands } = useBrands();
@@ -207,7 +210,17 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
   const systemSizeKW = Math.ceil(computedSystemSizeKW * 10) / 10;
 
   const handleCreateProject = async () => {
-    if (!actor || !clientName) return;
+    if (!actor) return;
+    if (!clientName.trim()) {
+      toast.error("Client name is required.");
+      return;
+    }
+    if (systemSizeKW <= 0) {
+      toast.error(
+        "System size must be greater than 0. Please enter a valid load.",
+      );
+      return;
+    }
     setIsSubmitting(true);
     try {
       const id = await actor.createProject(
@@ -239,19 +252,30 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
         );
       }
 
-      setProjectId(id);
+      // Auto-generate MOQ on the backend
+      await actor.generateMOQ(id);
+      // Fetch MOQ items directly and store them, then navigate
+      const fetchedMOQ = await actor.listMOQ(id);
+      queryClient.setQueryData(["moq", id.toString()], fetchedMOQ);
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setProjectId(id);
       setStep(2);
-      toast.success("Project created! Generating MOQ...");
-    } catch {
-      toast.error("Failed to create project");
+      toast.success("Project created! MOQ generated.");
+    } catch (err) {
+      console.error("createProject error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed to create project: ${msg}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const totalMOQCost =
-    moqItems?.reduce((sum, item) => sum + item.totalPrice, 0) ?? 0;
+    moqItems?.reduce((sum, item) => {
+      const effectivePrice =
+        priceOverrides[item.id.toString()] ?? item.unitPrice;
+      return sum + item.quantity * effectivePrice;
+    }, 0) ?? 0;
   const annualSavings =
     systemSizeKW * 4.5 * 365 * Number.parseFloat(tariff || "7");
   const subsidy = Number.parseFloat(subsidyAmount) || 0;
@@ -337,9 +361,9 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
             <div
               className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all ${
                 i === step
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-navy text-white"
                   : i < step
-                    ? "bg-primary/20 text-solar"
+                    ? "bg-solar text-navy font-semibold"
                     : "bg-secondary text-muted-foreground"
               }`}
             >
@@ -352,7 +376,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
             </div>
             {i < STEPS.length - 1 && (
               <div
-                className={`h-0.5 flex-1 rounded-full ${i < step ? "bg-primary/40" : "bg-border"}`}
+                className={`h-0.5 flex-1 rounded-full ${i < step ? "bg-navy/30" : "bg-border"}`}
               />
             )}
           </div>
@@ -364,7 +388,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <FileText className="h-4 w-4 text-solar" />
+              <FileText className="h-4 w-4 text-navy" />
               Project Information
             </CardTitle>
           </CardHeader>
@@ -456,7 +480,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Zap className="h-4 w-4 text-solar" />
+              <Zap className="h-4 w-4 text-navy" />
               Load Input
             </CardTitle>
           </CardHeader>
@@ -508,7 +532,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                     step="5"
                     value={dayNightRatio}
                     onChange={(e) => setDayNightRatio(e.target.value)}
-                    className="w-full mt-2 accent-[oklch(0.72_0.18_55)]"
+                    className="w-full mt-2 accent-navy"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground mt-1">
                     <span>30% (night-heavy)</span>
@@ -516,8 +540,8 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                   </div>
                 </div>
                 {monthlyKWh && Number.parseFloat(monthlyKWh) > 0 && (
-                  <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-                    <p className="text-sm font-medium text-solar">
+                  <div className="p-3 rounded-lg bg-solar/15 border border-solar/40">
+                    <p className="text-sm font-medium text-navy">
                       Estimated System Size:{" "}
                       <span className="text-lg font-bold">
                         {systemSizeKW.toFixed(1)} kWp
@@ -633,7 +657,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                 )}
 
                 {appliances.length > 0 && (
-                  <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 space-y-1.5">
+                  <div className="p-3 rounded-lg bg-solar/15 border border-solar/40 space-y-1.5">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
                         Connected Load
@@ -654,7 +678,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                       <span className="text-muted-foreground">
                         Estimated System Size
                       </span>
-                      <span className="font-bold text-solar">
+                      <span className="font-bold text-navy">
                         {systemSizeKW.toFixed(1)} kWp
                       </span>
                     </div>
@@ -683,8 +707,33 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Sun className="h-4 w-4 text-solar" />
+              <Sun className="h-4 w-4 text-navy" />
               Auto-Generated Bill of Materials (MOQ)
+              {projectId !== null && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto gap-1.5 text-xs"
+                  onClick={async () => {
+                    if (!actor || projectId === null) return;
+                    try {
+                      await actor.generateMOQ(projectId);
+                      const refreshedMOQ = await actor.listMOQ(projectId);
+                      queryClient.setQueryData(
+                        ["moq", projectId.toString()],
+                        refreshedMOQ,
+                      );
+                      toast.success("MOQ regenerated");
+                    } catch {
+                      toast.error("Failed to regenerate MOQ");
+                    }
+                  }}
+                >
+                  <Sun className="h-3.5 w-3.5" />
+                  Regenerate
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -702,7 +751,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                   The system will auto-generate materials based on your load
                   data.
                 </p>
-                <p className="text-sm text-solar mt-2">
+                <p className="text-sm text-navy mt-2">
                   System Size: {systemSizeKW.toFixed(1)} kWp | Type:{" "}
                   {systemType === "onGrid"
                     ? "On-Grid"
@@ -713,9 +762,12 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
               </div>
             ) : (
               <div className="space-y-4">
+                <p className="text-xs text-muted-foreground italic">
+                  Unit prices are editable. Click a price to update.
+                </p>
                 {Object.entries(moqByCategory).map(([category, items]) => (
                   <div key={category}>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-solar mb-2">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-navy mb-2">
                       {category}
                     </h4>
                     <Table>
@@ -735,25 +787,66 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {items.map((item) => (
-                          <TableRow key={item.id.toString()}>
-                            <TableCell className="text-sm">
-                              {item.itemName}
-                            </TableCell>
-                            <TableCell className="text-sm text-right">
-                              {item.quantity}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {item.unit}
-                            </TableCell>
-                            <TableCell className="text-sm text-right">
-                              ₹{item.unitPrice.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-sm text-right font-medium">
-                              ₹{item.totalPrice.toLocaleString()}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {items.map((item) => {
+                          const effectivePrice =
+                            priceOverrides[item.id.toString()] ??
+                            item.unitPrice;
+                          const effectiveTotal = item.quantity * effectivePrice;
+                          return (
+                            <TableRow key={item.id.toString()}>
+                              <TableCell className="text-sm">
+                                {item.itemName}
+                              </TableCell>
+                              <TableCell className="text-sm text-right">
+                                {item.quantity}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {item.unit}
+                              </TableCell>
+                              <TableCell className="text-sm text-right">
+                                <Input
+                                  type="number"
+                                  className="w-24 h-7 text-xs text-right"
+                                  value={
+                                    priceOverrides[item.id.toString()] ??
+                                    item.unitPrice
+                                  }
+                                  onChange={(e) => {
+                                    const val =
+                                      Number.parseFloat(e.target.value) || 0;
+                                    setPriceOverrides((prev) => ({
+                                      ...prev,
+                                      [item.id.toString()]: val,
+                                    }));
+                                  }}
+                                  onBlur={async (e) => {
+                                    const val =
+                                      Number.parseFloat(e.target.value) || 0;
+                                    try {
+                                      await actor?.updateMOQItem(
+                                        item.id,
+                                        item.itemName,
+                                        item.category,
+                                        item.quantity,
+                                        item.unit,
+                                        item.brand,
+                                        val,
+                                      );
+                                      queryClient.invalidateQueries({
+                                        queryKey: ["moq"],
+                                      });
+                                    } catch {
+                                      toast.error("Failed to update price");
+                                    }
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell className="text-sm text-right font-medium">
+                                ₹{effectiveTotal.toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -763,7 +856,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                   <span className="font-semibold">
                     Total Material Cost (Ex-GST)
                   </span>
-                  <span className="text-lg font-bold text-solar">
+                  <span className="text-lg font-bold text-navy">
                     ₹{totalMOQCost.toLocaleString()}
                   </span>
                 </div>
@@ -778,7 +871,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Battery className="h-4 w-4 text-solar" />
+              <Battery className="h-4 w-4 text-navy" />
               Brand Selection
             </CardTitle>
           </CardHeader>
@@ -795,7 +888,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
               Object.entries(brandsByCategory).map(
                 ([category, categoryBrands]) => (
                   <div key={category}>
-                    <Label className="text-xs font-semibold uppercase tracking-wider text-solar">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-navy">
                       {category}
                     </Label>
                     <div className="flex flex-wrap gap-2 mt-2">
@@ -813,8 +906,8 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                             }
                             className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-all ${
                               selectedBrands[category] === brand.name
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
+                                ? "bg-navy text-white border-navy"
+                                : "bg-secondary text-secondary-foreground border-border hover:border-solar/60 hover:bg-solar/10"
                             }`}
                           >
                             {brand.name}
@@ -834,7 +927,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                   {Object.entries(selectedBrands).map(([cat, name]) => (
                     <Badge
                       key={cat}
-                      className="bg-primary/20 text-solar text-xs"
+                      className="bg-solar/25 text-solar-dark text-xs border border-solar/40"
                     >
                       {cat}: {name}
                     </Badge>
@@ -852,7 +945,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-solar" />
+                <TrendingUp className="h-4 w-4 text-navy" />
                 Quotation Details
               </CardTitle>
             </CardHeader>
@@ -954,7 +1047,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                       {label}
                     </span>
                     <span
-                      className={`text-sm font-semibold ${highlight ? "text-solar" : "text-foreground"}`}
+                      className={`text-sm font-semibold ${highlight ? "text-navy" : "text-foreground"}`}
                     >
                       {value}
                     </span>
@@ -968,7 +1061,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-solar" />
+                <TrendingUp className="h-4 w-4 text-navy" />
                 25-Year ROI Projection
               </CardTitle>
             </CardHeader>
@@ -980,25 +1073,25 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="oklch(0.28 0.012 58)"
+                      stroke="oklch(0.88 0.03 245)"
                     />
                     <XAxis
                       dataKey="year"
-                      tick={{ fontSize: 10, fill: "oklch(0.58 0.02 65)" }}
+                      tick={{ fontSize: 10, fill: "oklch(0.52 0.04 255)" }}
                     />
                     <YAxis
-                      tick={{ fontSize: 10, fill: "oklch(0.58 0.02 65)" }}
+                      tick={{ fontSize: 10, fill: "oklch(0.52 0.04 255)" }}
                       tickFormatter={(v: number) =>
                         `₹${(v / 1000).toFixed(0)}K`
                       }
                     />
                     <Tooltip
                       contentStyle={{
-                        background: "oklch(0.18 0.01 58)",
-                        border: "1px solid oklch(0.28 0.012 58)",
+                        background: "white",
+                        border: "1px solid oklch(0.88 0.03 245)",
                         borderRadius: "6px",
                         fontSize: "12px",
-                        color: "oklch(0.94 0.012 70)",
+                        color: "oklch(0.18 0.025 255)",
                       }}
                       formatter={(value: number) => [
                         `₹${value.toLocaleString()}`,
@@ -1007,7 +1100,7 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                     />
                     <Bar
                       dataKey="cumulative"
-                      fill="oklch(0.72 0.18 55)"
+                      fill="oklch(0.35 0.14 255)"
                       radius={[3, 3, 0, 0]}
                     />
                   </BarChart>
@@ -1020,33 +1113,33 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
                   <LineChart data={roiData.slice(0, 10)}>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="oklch(0.28 0.012 58)"
+                      stroke="oklch(0.88 0.03 245)"
                     />
                     <XAxis
                       dataKey="year"
-                      tick={{ fontSize: 10, fill: "oklch(0.58 0.02 65)" }}
+                      tick={{ fontSize: 10, fill: "oklch(0.52 0.04 255)" }}
                     />
                     <YAxis
-                      tick={{ fontSize: 10, fill: "oklch(0.58 0.02 65)" }}
+                      tick={{ fontSize: 10, fill: "oklch(0.52 0.04 255)" }}
                       tickFormatter={(v: number) =>
                         `₹${(v / 1000).toFixed(0)}K`
                       }
                     />
                     <Tooltip
                       contentStyle={{
-                        background: "oklch(0.18 0.01 58)",
-                        border: "1px solid oklch(0.28 0.012 58)",
+                        background: "white",
+                        border: "1px solid oklch(0.88 0.03 245)",
                         borderRadius: "6px",
                         fontSize: "12px",
-                        color: "oklch(0.94 0.012 70)",
+                        color: "oklch(0.18 0.025 255)",
                       }}
                     />
                     <Legend />
                     <Line
                       type="monotone"
                       dataKey="annual"
-                      stroke="oklch(0.68 0.15 195)"
-                      strokeWidth={2}
+                      stroke="oklch(0.88 0.19 88)"
+                      strokeWidth={2.5}
                       dot={false}
                       name="Annual Savings"
                     />
@@ -1075,7 +1168,12 @@ export function ProjectWizard({ onComplete }: { onComplete: () => void }) {
             <Button
               type="button"
               onClick={handleCreateProject}
-              disabled={!canProceedStep1 || !canProceedStep2 || isSubmitting}
+              disabled={
+                !canProceedStep1 ||
+                !canProceedStep2 ||
+                systemSizeKW <= 0 ||
+                isSubmitting
+              }
               className="gap-2"
             >
               {isSubmitting ? (
