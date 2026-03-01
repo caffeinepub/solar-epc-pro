@@ -9,9 +9,9 @@ import List "mo:core/List";
 import Nat "mo:core/Nat";
 import Order "mo:core/Order";
 import Float "mo:core/Float";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   // Types
   type ProjectStatus = {
