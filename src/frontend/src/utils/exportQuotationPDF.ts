@@ -5,24 +5,10 @@ import {
 } from "../backend.d";
 import type { CompanyProfile } from "../hooks/useCompanyProfile";
 
-// Dynamic imports for jsPDF to avoid SSR issues
-// We import them at the module level since this is browser-only code
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-
-// ─── Color constants ─────────────────────────────────────────────────────────
-const NAVY = [30, 58, 95] as [number, number, number];
-const NAVY_LIGHT = [44, 82, 130] as [number, number, number];
-const YELLOW = [245, 166, 35] as [number, number, number];
-const BODY_TEXT = [51, 51, 51] as [number, number, number];
-const LIGHT_GRAY = [248, 249, 250] as [number, number, number];
-const MID_GRAY = [220, 220, 225] as [number, number, number];
-const WHITE = [255, 255, 255] as [number, number, number];
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatCurrency(value: number): string {
-  return `\u20B9${value.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+  return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
 function formatDate(date: Date): string {
@@ -63,45 +49,16 @@ function formatInstallationType(
   return map[type] ?? String(type);
 }
 
-// ─── Section drawing helpers ─────────────────────────────────────────────────
-
-function drawSectionHeading(doc: jsPDF, title: string, y: number): number {
-  // Navy bold uppercase text
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...NAVY);
-  doc.text(title.toUpperCase(), 14, y);
-
-  // Yellow accent underline bar (40pt wide, 1.5pt tall)
-  doc.setFillColor(...YELLOW);
-  doc.rect(14, y + 1.5, 40, 1.5, "F");
-
-  return y + 8; // Return Y position after the heading
-}
-
-function addFooter(doc: jsPDF, pageNum: number, totalPages: number): void {
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const footerY = pageHeight - 12;
-
-  // Footer line
-  doc.setDrawColor(...MID_GRAY);
-  doc.setLineWidth(0.3);
-  doc.line(14, footerY - 2, pageWidth - 14, footerY - 2);
-
-  // Left: confidential
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(120, 120, 130);
-  doc.text("Solar EPC Pro | Confidential", 14, footerY + 3);
-
-  // Right: page number
-  doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth - 14, footerY + 3, {
-    align: "right",
-  });
+function row(label: string, value: string) {
+  return `
+    <tr>
+      <td style="padding:4px 8px;font-weight:bold;color:#1e3a5f;width:40%;">${label}</td>
+      <td style="padding:4px 8px;">${value}</td>
+    </tr>`;
 }
 
 // ─── Main export function ─────────────────────────────────────────────────────
+// Uses browser print dialog to generate a PDF — no external library needed.
 
 export async function exportQuotationPDF(
   quotation: Quotation,
@@ -109,370 +66,44 @@ export async function exportQuotationPDF(
   project: Project | undefined,
   moqItems: MOQItem[],
 ): Promise<void> {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const pageWidth = doc.internal.pageSize.getWidth();
   const today = new Date();
-  let curY = 14;
-
-  // ── Section 1: Letterhead ─────────────────────────────────────────────────
-  const headerStartY = curY;
-  const logoMaxH = 22;
-  const logoMaxW = 40;
-  let logoEndX = 14;
-
-  // Try to embed logo
-  if (companyProfile.logoBase64 && companyProfile.logoBase64.length > 100) {
-    try {
-      // Detect image format
-      const format = companyProfile.logoBase64.toLowerCase().includes("jpeg")
-        ? "JPEG"
-        : "PNG";
-      doc.addImage(
-        companyProfile.logoBase64,
-        format,
-        14,
-        headerStartY,
-        logoMaxW,
-        logoMaxH,
-        undefined,
-        "FAST",
-      );
-      logoEndX = 14 + logoMaxW + 6;
-    } catch {
-      // If image fails, skip gracefully
-      logoEndX = 14;
-    }
-  }
-
-  // Company name (bold, large)
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.setTextColor(...NAVY);
-  const companyName = companyProfile.companyName || "Solar EPC Company";
-  doc.text(companyName, logoEndX, headerStartY + 7);
-
-  // Company address
-  if (companyProfile.companyAddress) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(...BODY_TEXT);
-    const addressLines = doc.splitTextToSize(
-      companyProfile.companyAddress,
-      pageWidth - logoEndX - 70,
-    );
-    doc.text(addressLines, logoEndX, headerStartY + 13);
-  }
-
-  // GSTIN
-  if (companyProfile.gstNumber) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(...BODY_TEXT);
-    doc.text(`GSTIN: ${companyProfile.gstNumber}`, logoEndX, headerStartY + 20);
-  }
-
-  // Right side: Proposal number and date
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...NAVY);
-  doc.text(
-    `Proposal No.: ${quotation.proposalNumber}`,
-    pageWidth - 14,
-    headerStartY + 7,
-    {
-      align: "right",
-    },
-  );
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...BODY_TEXT);
-  doc.text(`Date: ${formatDate(today)}`, pageWidth - 14, headerStartY + 13, {
-    align: "right",
-  });
-
-  // Navy divider below header
-  curY = headerStartY + 28;
-  doc.setDrawColor(...NAVY);
-  doc.setLineWidth(0.8);
-  doc.line(14, curY, pageWidth - 14, curY);
-  curY += 8;
-
-  // ── Section 2: Client Details ─────────────────────────────────────────────
-  curY = drawSectionHeading(doc, "Client Details", curY);
-
-  autoTable(doc, {
-    startY: curY,
-    head: [],
-    body: [
-      ["Client Name", quotation.clientName || "—"],
-      ["Site / Company", quotation.companyName || "—"],
-      ["Contact", "—"],
-      ["Proposal No.", quotation.proposalNumber],
-      ["Date", formatDate(today)],
-    ],
-    theme: "plain",
-    styles: {
-      fontSize: 9,
-      textColor: BODY_TEXT,
-      cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 },
-    },
-    columnStyles: {
-      0: {
-        fontStyle: "bold",
-        textColor: NAVY,
-        cellWidth: 45,
-      },
-      1: { cellWidth: "auto" },
-    },
-    tableLineWidth: 0,
-    margin: { left: 14, right: 14 },
-  });
-
-  curY =
-    (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable
-      .finalY + 8;
-
-  // ── Section 3: System Summary ─────────────────────────────────────────────
-  curY = drawSectionHeading(doc, "System Summary", curY);
-
-  if (project) {
-    const netInvestment = quotation.totalCost - quotation.subsidy;
-    autoTable(doc, {
-      startY: curY,
-      head: [],
-      body: [
-        ["System Type", formatSystemType(project.systemType)],
-        ["System Capacity", `${project.systemSizeKW} kWp`],
-        ["Installation Type", formatInstallationType(project.installationType)],
-        [
-          "Battery Capacity",
-          project.batteryCapacityKWh && project.batteryCapacityKWh > 0
-            ? `${project.batteryCapacityKWh} kWh`
-            : "N/A",
-        ],
-        ["Total Project Cost", formatCurrency(quotation.totalCost)],
-        ["GST", `${quotation.gst}%`],
-        [
-          "Subsidy",
-          quotation.subsidy > 0 ? formatCurrency(quotation.subsidy) : "—",
-        ],
-        ["Net Investment", formatCurrency(netInvestment)],
-      ],
-      theme: "plain",
-      styles: {
-        fontSize: 9,
-        textColor: BODY_TEXT,
-        cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 },
-      },
-      columnStyles: {
-        0: {
-          fontStyle: "bold",
-          textColor: NAVY,
-          cellWidth: 45,
-        },
-        1: { cellWidth: "auto" },
-      },
-      tableLineWidth: 0,
-      margin: { left: 14, right: 14 },
-    });
-  } else {
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(140, 140, 150);
-    doc.text("Project details not available.", 14, curY + 4);
-    curY += 10;
-  }
-
-  curY =
-    (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable
-      .finalY + 8;
-
-  // ── Section 4: Bill of Materials ──────────────────────────────────────────
-  // Check if we need a new page
-  if (curY > 230) {
-    doc.addPage();
-    curY = 14;
-  }
-
-  curY = drawSectionHeading(doc, "Bill of Materials", curY);
-
-  if (!moqItems || moqItems.length === 0) {
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(140, 140, 150);
-    doc.text("MOQ not yet generated for this project.", 14, curY + 4);
-    curY += 12;
-  } else {
-    // Group by category
-    const grouped = moqItems.reduce(
-      (acc, item) => {
-        const cat = item.category || "General";
-        if (!acc[cat]) acc[cat] = [];
-        acc[cat].push(item);
-        return acc;
-      },
-      {} as Record<string, MOQItem[]>,
-    );
-
-    const tableBody: (
-      | string
-      | { content: string; colSpan?: number; styles?: object }
-    )[][] = [];
-
-    let serialNo = 0;
-    const grandTotal = moqItems.reduce((s, i) => s + i.totalPrice, 0);
-
-    for (const [category, items] of Object.entries(grouped)) {
-      // Category header row
-      tableBody.push([
-        {
-          content: category.toUpperCase(),
-          colSpan: 7,
-          styles: {
-            fillColor: LIGHT_GRAY,
-            textColor: NAVY,
-            fontStyle: "bold" as const,
-            fontSize: 8.5,
-          },
-        },
-      ]);
-
-      // Item rows
-      for (const item of items) {
-        serialNo += 1;
-        tableBody.push([
-          String(serialNo),
-          item.itemName,
-          item.brand || "—",
-          String(item.quantity),
-          item.unit,
-          formatCurrency(item.unitPrice),
-          formatCurrency(item.totalPrice),
-        ]);
-      }
-    }
-
-    // Grand total row
-    tableBody.push([
-      {
-        content: "GRAND TOTAL",
-        colSpan: 6,
-        styles: {
-          fillColor: NAVY,
-          textColor: WHITE,
-          fontStyle: "bold" as const,
-        },
-      },
-      {
-        content: formatCurrency(grandTotal),
-        styles: {
-          fillColor: NAVY,
-          textColor: WHITE,
-          fontStyle: "bold" as const,
-          halign: "right" as const,
-        },
-      },
-    ]);
-
-    autoTable(doc, {
-      startY: curY,
-      head: [["#", "Item Name", "Brand", "Qty", "Unit", "Unit Price", "Total"]],
-      body: tableBody,
-      theme: "grid",
-      headStyles: {
-        fillColor: NAVY_LIGHT,
-        textColor: WHITE,
-        fontSize: 8.5,
-        fontStyle: "bold",
-        cellPadding: { top: 2, bottom: 2, left: 2, right: 2 },
-      },
-      bodyStyles: {
-        fontSize: 8,
-        textColor: BODY_TEXT,
-        cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 },
-      },
-      columnStyles: {
-        0: { cellWidth: 8, halign: "center" },
-        1: { cellWidth: "auto" },
-        2: { cellWidth: 28 },
-        3: { cellWidth: 12, halign: "center" },
-        4: { cellWidth: 14, halign: "center" },
-        5: { cellWidth: 24, halign: "right" },
-        6: { cellWidth: 24, halign: "right" },
-      },
-      margin: { left: 14, right: 14 },
-    });
-
-    curY =
-      (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable
-        .finalY + 8;
-  }
-
-  // ── Section 5: ROI Summary ────────────────────────────────────────────────
-  if (curY > 230) {
-    doc.addPage();
-    curY = 14;
-  }
-
-  curY = drawSectionHeading(doc, "Return on Investment", curY);
-
   const netInv = quotation.totalCost - quotation.subsidy;
   const netSavings25 = quotation.annualSavings * 25 - netInv;
 
-  autoTable(doc, {
-    startY: curY,
-    head: [["Parameter", "Value"]],
-    body: [
-      ["Total Project Cost", formatCurrency(quotation.totalCost)],
-      [
-        "Subsidy",
-        quotation.subsidy > 0 ? formatCurrency(quotation.subsidy) : "—",
-      ],
-      ["Net Investment", formatCurrency(netInv)],
-      ["Annual Energy Savings", formatCurrency(quotation.annualSavings)],
-      ["Payback Period", `${quotation.paybackYears.toFixed(1)} years`],
-      ["Internal Rate of Return (IRR)", `${quotation.irr.toFixed(1)}%`],
-      [
-        "25-Year Net Savings",
-        formatCurrency(netSavings25 > 0 ? netSavings25 : 0),
-      ],
-      [
-        "Carbon Offset",
-        `${quotation.carbonSavings.toFixed(2)} tonnes CO\u2082/year`,
-      ],
-    ],
-    theme: "grid",
-    headStyles: {
-      fillColor: NAVY,
-      textColor: WHITE,
-      fontSize: 9,
-      fontStyle: "bold",
-      cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+  // Group MOQ items by category
+  const grouped = (moqItems ?? []).reduce(
+    (acc, item) => {
+      const cat = item.category || "General";
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+      return acc;
     },
-    bodyStyles: {
-      fontSize: 9,
-      textColor: BODY_TEXT,
-      cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
-    },
-    columnStyles: {
-      0: { fontStyle: "bold", cellWidth: 80, textColor: NAVY },
-      1: { cellWidth: "auto", halign: "right" },
-    },
-    alternateRowStyles: { fillColor: LIGHT_GRAY },
-    margin: { left: 14, right: 14 },
-  });
+    {} as Record<string, MOQItem[]>,
+  );
 
-  curY =
-    (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable
-      .finalY + 8;
+  const grandTotal = (moqItems ?? []).reduce((s, i) => s + i.totalPrice, 0);
 
-  // ── Section 6: Terms & Conditions ─────────────────────────────────────────
-  if (curY > 240) {
-    doc.addPage();
-    curY = 14;
+  let moqTableRows = "";
+  let serial = 0;
+  for (const [cat, items] of Object.entries(grouped)) {
+    moqTableRows += `
+      <tr>
+        <td colspan="7" style="background:#f0f4f8;font-weight:bold;color:#1e3a5f;padding:5px 8px;font-size:10px;">${cat.toUpperCase()}</td>
+      </tr>`;
+    for (const item of items) {
+      serial += 1;
+      moqTableRows += `
+        <tr>
+          <td style="padding:4px 6px;text-align:center;">${serial}</td>
+          <td style="padding:4px 6px;">${item.itemName}</td>
+          <td style="padding:4px 6px;">${item.brand || "—"}</td>
+          <td style="padding:4px 6px;text-align:center;">${item.quantity}</td>
+          <td style="padding:4px 6px;text-align:center;">${item.unit}</td>
+          <td style="padding:4px 6px;text-align:right;">${formatCurrency(item.unitPrice)}</td>
+          <td style="padding:4px 6px;text-align:right;font-weight:bold;">${formatCurrency(item.totalPrice)}</td>
+        </tr>`;
+    }
   }
-
-  curY = drawSectionHeading(doc, "Terms & Conditions", curY);
 
   const defaultTerms =
     "1. Payment Terms: 50% advance, 40% before delivery, 10% on commissioning.\n" +
@@ -482,27 +113,182 @@ export async function exportQuotationPDF(
     "5. Force majeure: The company shall not be liable for delays due to circumstances beyond its control.";
 
   const termsText =
-    quotation.termsAndConditions &&
-    quotation.termsAndConditions.trim().length > 0
+    quotation.termsAndConditions?.trim().length > 0
       ? quotation.termsAndConditions
       : defaultTerms;
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(...BODY_TEXT);
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Quotation - ${quotation.proposalNumber}</title>
+  <style>
+    @page { size: A4; margin: 15mm 12mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #333; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1e3a5f; padding-bottom: 10px; margin-bottom: 14px; }
+    .company-logo { max-height: 60px; max-width: 100px; object-fit: contain; }
+    .company-info h1 { font-size: 16px; color: #1e3a5f; margin-bottom: 3px; }
+    .company-info p { font-size: 9px; color: #555; line-height: 1.4; }
+    .proposal-info { text-align: right; }
+    .proposal-info h2 { font-size: 12px; color: #1e3a5f; }
+    .proposal-info p { font-size: 9px; color: #555; }
+    .section { margin-bottom: 14px; }
+    .section-title { font-size: 11px; font-weight: bold; color: #1e3a5f; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1.5px solid #f5a623; padding-bottom: 2px; }
+    table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+    th { background: #1e3a5f; color: #fff; padding: 5px 8px; text-align: left; }
+    td { border-bottom: 1px solid #e8e8e8; }
+    .alt { background: #f8f9fa; }
+    .grand-total td { background: #1e3a5f; color: #fff; font-weight: bold; padding: 5px 8px; }
+    .terms { font-size: 9px; line-height: 1.6; white-space: pre-line; color: #444; }
+    .footer { text-align: center; font-size: 8px; color: #999; border-top: 1px solid #ddd; padding-top: 6px; margin-top: 14px; }
+    .yellow-bar { background: #f5a623; height: 2px; width: 40px; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <!-- Letterhead -->
+  <div class="header">
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      ${companyProfile.logoBase64 ? `<img src="${companyProfile.logoBase64}" class="company-logo" alt="logo">` : ""}
+      <div class="company-info">
+        <h1>${companyProfile.companyName || "Solar EPC Company"}</h1>
+        ${companyProfile.companyAddress ? `<p>${companyProfile.companyAddress}</p>` : ""}
+        ${companyProfile.gstNumber ? `<p>GSTIN: ${companyProfile.gstNumber}</p>` : ""}
+      </div>
+    </div>
+    <div class="proposal-info">
+      <h2>PROPOSAL</h2>
+      <p>Proposal No.: <strong>${quotation.proposalNumber}</strong></p>
+      <p>Date: ${formatDate(today)}</p>
+    </div>
+  </div>
 
-  const termsLines = doc.splitTextToSize(termsText, pageWidth - 28);
-  doc.text(termsLines, 14, curY);
-  curY += termsLines.length * 4.5 + 8;
+  <!-- Client Details -->
+  <div class="section">
+    <div class="section-title">Client Details</div>
+    <table>
+      <tbody>
+        ${row("Client Name", quotation.clientName || "—")}
+        ${row("Site / Company", quotation.companyName || "—")}
+        ${row("Proposal No.", quotation.proposalNumber)}
+        ${row("Date", formatDate(today))}
+      </tbody>
+    </table>
+  </div>
 
-  // ── Add footers to all pages ──────────────────────────────────────────────
-  const totalPages = doc.getNumberOfPages();
-  for (let p = 1; p <= totalPages; p++) {
-    doc.setPage(p);
-    addFooter(doc, p, totalPages);
+  ${
+    project
+      ? `<div class="section">
+    <div class="section-title">System Summary</div>
+    <table>
+      <tbody>
+        ${row("System Type", formatSystemType(project.systemType))}
+        ${row("System Capacity", `${project.systemSizeKW} kWp`)}
+        ${row("Installation Type", formatInstallationType(project.installationType))}
+        ${row("Battery Capacity", project.batteryCapacityKWh && project.batteryCapacityKWh > 0 ? `${project.batteryCapacityKWh} kWh` : "N/A")}
+        ${row("Total Project Cost", formatCurrency(quotation.totalCost))}
+        ${row("GST", `${quotation.gst}%`)}
+        ${row("Subsidy", quotation.subsidy > 0 ? formatCurrency(quotation.subsidy) : "—")}
+        ${row("Net Investment", formatCurrency(netInv))}
+      </tbody>
+    </table>
+  </div>`
+      : ""
   }
 
-  // ── Save ──────────────────────────────────────────────────────────────────
-  const filename = `Quotation_${sanitizeFilename(quotation.proposalNumber)}_${sanitizeFilename(quotation.clientName)}.pdf`;
-  doc.save(filename);
+  <!-- Bill of Materials -->
+  <div class="section">
+    <div class="section-title">Bill of Materials</div>
+    ${
+      moqItems && moqItems.length > 0
+        ? `<table>
+      <thead>
+        <tr>
+          <th style="width:28px;">#</th>
+          <th>Item Name</th>
+          <th>Brand</th>
+          <th style="width:40px;text-align:center;">Qty</th>
+          <th style="width:40px;text-align:center;">Unit</th>
+          <th style="width:70px;text-align:right;">Unit Price</th>
+          <th style="width:70px;text-align:right;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${moqTableRows}
+        <tr class="grand-total">
+          <td colspan="6" style="padding:5px 8px;">GRAND TOTAL (Ex-GST)</td>
+          <td style="text-align:right;padding:5px 8px;">${formatCurrency(grandTotal)}</td>
+        </tr>
+      </tbody>
+    </table>`
+        : `<p style="color:#999;font-style:italic;padding:6px 0;">MOQ not yet generated for this project.</p>`
+    }
+  </div>
+
+  <!-- ROI -->
+  <div class="section">
+    <div class="section-title">Return on Investment</div>
+    <table>
+      <thead>
+        <tr><th>Parameter</th><th style="text-align:right;">Value</th></tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:4px 8px;font-weight:bold;color:#1e3a5f;">Total Project Cost</td><td style="padding:4px 8px;text-align:right;">${formatCurrency(quotation.totalCost)}</td></tr>
+        <tr class="alt"><td style="padding:4px 8px;font-weight:bold;color:#1e3a5f;">Subsidy</td><td style="padding:4px 8px;text-align:right;">${quotation.subsidy > 0 ? formatCurrency(quotation.subsidy) : "—"}</td></tr>
+        <tr><td style="padding:4px 8px;font-weight:bold;color:#1e3a5f;">Net Investment</td><td style="padding:4px 8px;text-align:right;">${formatCurrency(netInv)}</td></tr>
+        <tr class="alt"><td style="padding:4px 8px;font-weight:bold;color:#1e3a5f;">Annual Energy Savings</td><td style="padding:4px 8px;text-align:right;">${formatCurrency(quotation.annualSavings)}</td></tr>
+        <tr><td style="padding:4px 8px;font-weight:bold;color:#1e3a5f;">Payback Period</td><td style="padding:4px 8px;text-align:right;">${quotation.paybackYears.toFixed(1)} years</td></tr>
+        <tr class="alt"><td style="padding:4px 8px;font-weight:bold;color:#1e3a5f;">Internal Rate of Return (IRR)</td><td style="padding:4px 8px;text-align:right;">${quotation.irr.toFixed(1)}%</td></tr>
+        <tr><td style="padding:4px 8px;font-weight:bold;color:#1e3a5f;">25-Year Net Savings</td><td style="padding:4px 8px;text-align:right;">${formatCurrency(netSavings25 > 0 ? netSavings25 : 0)}</td></tr>
+        <tr class="alt"><td style="padding:4px 8px;font-weight:bold;color:#1e3a5f;">Carbon Offset</td><td style="padding:4px 8px;text-align:right;">${quotation.carbonSavings.toFixed(2)} tonnes CO₂/year</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Terms & Conditions -->
+  <div class="section">
+    <div class="section-title">Terms &amp; Conditions</div>
+    <p class="terms">${termsText}</p>
+  </div>
+
+  <div class="footer">
+    Solar EPC Pro | ${companyProfile.companyName || "Solar EPC Company"} | Confidential
+  </div>
+</body>
+</html>`;
+
+  // Open in a new window and trigger print dialog
+  const printWindow = window.open("", "_blank", "width=900,height=700");
+  if (!printWindow) {
+    // Fallback: download as HTML
+    const blob = new Blob([html], { type: "text/html;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Quotation_${sanitizeFilename(quotation.proposalNumber)}_${sanitizeFilename(quotation.clientName)}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return;
+  }
+
+  printWindow.document.write(html);
+  printWindow.document.close();
+
+  // Give images time to load, then print
+  printWindow.onload = () => {
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 300);
+  };
+
+  // Fallback if onload doesn't fire
+  setTimeout(() => {
+    if (!printWindow.closed) {
+      printWindow.focus();
+      printWindow.print();
+    }
+  }, 800);
 }

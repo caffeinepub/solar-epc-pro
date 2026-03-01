@@ -134,6 +134,19 @@ export interface User {
     isActive: boolean;
     email: string;
 }
+export interface ProductMaster {
+    id: bigint;
+    voltage: string;
+    efficiency: number;
+    unit: string;
+    pricePerUnit: number;
+    productType: string;
+    isActive: boolean;
+    warrantyYears: bigint;
+    category: string;
+    brand: string;
+    capacity: string;
+}
 export interface AuditEntry {
     id: bigint;
     action: string;
@@ -198,19 +211,27 @@ export interface backendInterface {
     addMOQItem(projectId: bigint, itemName: string, category: string, quantity: number, unit: string, brand: string, unitPrice: number): Promise<bigint>;
     createBrand(category: string, name: string, isActive: boolean): Promise<bigint>;
     createInventoryItem(sku: string, name: string, category: string, quantityOnHand: bigint, minStock: bigint, unit: string, warehouseLocation: string): Promise<bigint>;
+    createProductMaster(category: string, brand: string, productType: string, capacity: string, voltage: string, pricePerUnit: number, unit: string, efficiency: number, warrantyYears: bigint, isActive: boolean): Promise<bigint>;
     createProject(clientName: string, systemType: Variant_hybrid_offGrid_onGrid, installationType: Variant_sheetMetal_rccRooftop_other_groundMount, loadInputMethod: Variant_applianceBased_consumptionBased, systemSizeKW: number, batteryCapacityKWh: number): Promise<bigint>;
     createQuotation(proposalNumber: string, clientName: string, companyName: string, gst: number, totalCost: number, subsidy: number, paybackYears: number, annualSavings: number, irr: number, carbonSavings: number, status: QuotationStatus, termsAndConditions: string): Promise<bigint>;
     createUser(name: string, email: string, role: UserRole, isActive: boolean): Promise<bigint>;
     deleteMOQItem(id: bigint): Promise<void>;
+    deleteProductMaster(id: bigint): Promise<void>;
     generateMOQ(projectId: bigint): Promise<void>;
+    generateMOQWithProducts(projectId: bigint, panelProductId: bigint | null, inverterProductId: bigint | null, batteryProductId: bigint | null, cableProductId: bigint | null, structureProductId: bigint | null): Promise<void>;
     getAuditLog(): Promise<Array<AuditEntry>>;
+    getProject(id: bigint): Promise<Project | null>;
     listBrands(): Promise<Array<Brand>>;
     listInventory(): Promise<Array<InventoryItem>>;
     listMOQ(projectId: bigint): Promise<Array<MOQItem>>;
+    listProductMaster(): Promise<Array<ProductMaster>>;
+    listProductMasterByCategory(category: string): Promise<Array<ProductMaster>>;
     listProjects(): Promise<Array<Project>>;
     listQuotations(): Promise<Array<Quotation>>;
     listUsers(): Promise<Array<User>>;
     updateMOQItem(id: bigint, itemName: string, category: string, quantity: number, unit: string, brand: string, unitPrice: number): Promise<void>;
+    updateProductMaster(id: bigint, category: string, brand: string, productType: string, capacity: string, voltage: string, pricePerUnit: number, unit: string, efficiency: number, warrantyYears: bigint, isActive: boolean): Promise<void>;
+    updateProject(id: bigint, clientName: string, systemType: Variant_hybrid_offGrid_onGrid, installationType: Variant_sheetMetal_rccRooftop_other_groundMount, systemSizeKW: number, batteryCapacityKWh: number): Promise<void>;
 }
 import type { Project as _Project, ProjectStatus as _ProjectStatus, Quotation as _Quotation, QuotationStatus as _QuotationStatus, User as _User, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -285,6 +306,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async createProductMaster(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: number, arg6: string, arg7: number, arg8: bigint, arg9: boolean): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createProductMaster(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createProductMaster(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+            return result;
+        }
+    }
     async createProject(arg0: string, arg1: Variant_hybrid_offGrid_onGrid, arg2: Variant_sheetMetal_rccRooftop_other_groundMount, arg3: Variant_applianceBased_consumptionBased, arg4: number, arg5: number): Promise<bigint> {
         if (this.processError) {
             try {
@@ -341,6 +376,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async deleteProductMaster(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteProductMaster(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteProductMaster(arg0);
+            return result;
+        }
+    }
     async generateMOQ(arg0: bigint): Promise<void> {
         if (this.processError) {
             try {
@@ -352,6 +401,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.generateMOQ(arg0);
+            return result;
+        }
+    }
+    async generateMOQWithProducts(arg0: bigint, arg1: bigint | null, arg2: bigint | null, arg3: bigint | null, arg4: bigint | null, arg5: bigint | null): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.generateMOQWithProducts(arg0, to_candid_opt_n8(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n8(this._uploadFile, this._downloadFile, arg2), to_candid_opt_n8(this._uploadFile, this._downloadFile, arg3), to_candid_opt_n8(this._uploadFile, this._downloadFile, arg4), to_candid_opt_n8(this._uploadFile, this._downloadFile, arg5));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.generateMOQWithProducts(arg0, to_candid_opt_n8(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n8(this._uploadFile, this._downloadFile, arg2), to_candid_opt_n8(this._uploadFile, this._downloadFile, arg3), to_candid_opt_n8(this._uploadFile, this._downloadFile, arg4), to_candid_opt_n8(this._uploadFile, this._downloadFile, arg5));
             return result;
         }
     }
@@ -367,6 +430,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getAuditLog();
             return result;
+        }
+    }
+    async getProject(arg0: bigint): Promise<Project | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getProject(arg0);
+                return from_candid_opt_n9(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getProject(arg0);
+            return from_candid_opt_n9(this._uploadFile, this._downloadFile, result);
         }
     }
     async listBrands(): Promise<Array<Brand>> {
@@ -411,46 +488,74 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async listProductMaster(): Promise<Array<ProductMaster>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listProductMaster();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listProductMaster();
+            return result;
+        }
+    }
+    async listProductMasterByCategory(arg0: string): Promise<Array<ProductMaster>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listProductMasterByCategory(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listProductMasterByCategory(arg0);
+            return result;
+        }
+    }
     async listProjects(): Promise<Array<Project>> {
         if (this.processError) {
             try {
                 const result = await this.actor.listProjects();
-                return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n17(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.listProjects();
-            return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n17(this._uploadFile, this._downloadFile, result);
         }
     }
     async listQuotations(): Promise<Array<Quotation>> {
         if (this.processError) {
             try {
                 const result = await this.actor.listQuotations();
-                return from_candid_vec_n16(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n18(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.listQuotations();
-            return from_candid_vec_n16(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n18(this._uploadFile, this._downloadFile, result);
         }
     }
     async listUsers(): Promise<Array<User>> {
         if (this.processError) {
             try {
                 const result = await this.actor.listUsers();
-                return from_candid_vec_n21(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n23(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.listUsers();
-            return from_candid_vec_n21(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n23(this._uploadFile, this._downloadFile, result);
         }
     }
     async updateMOQItem(arg0: bigint, arg1: string, arg2: string, arg3: number, arg4: string, arg5: string, arg6: number): Promise<void> {
@@ -467,26 +572,57 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async updateProductMaster(arg0: bigint, arg1: string, arg2: string, arg3: string, arg4: string, arg5: string, arg6: number, arg7: string, arg8: number, arg9: bigint, arg10: boolean): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateProductMaster(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateProductMaster(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+            return result;
+        }
+    }
+    async updateProject(arg0: bigint, arg1: string, arg2: Variant_hybrid_offGrid_onGrid, arg3: Variant_sheetMetal_rccRooftop_other_groundMount, arg4: number, arg5: number): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateProject(arg0, arg1, to_candid_variant_n1(this._uploadFile, this._downloadFile, arg2), to_candid_variant_n2(this._uploadFile, this._downloadFile, arg3), arg4, arg5);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateProject(arg0, arg1, to_candid_variant_n1(this._uploadFile, this._downloadFile, arg2), to_candid_variant_n2(this._uploadFile, this._downloadFile, arg3), arg4, arg5);
+            return result;
+        }
+    }
 }
-function from_candid_ProjectStatus_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ProjectStatus): ProjectStatus {
-    return from_candid_variant_n13(_uploadFile, _downloadFile, value);
+function from_candid_ProjectStatus_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ProjectStatus): ProjectStatus {
+    return from_candid_variant_n14(_uploadFile, _downloadFile, value);
 }
-function from_candid_Project_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Project): Project {
-    return from_candid_record_n10(_uploadFile, _downloadFile, value);
+function from_candid_Project_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Project): Project {
+    return from_candid_record_n11(_uploadFile, _downloadFile, value);
 }
-function from_candid_QuotationStatus_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _QuotationStatus): QuotationStatus {
-    return from_candid_variant_n20(_uploadFile, _downloadFile, value);
+function from_candid_QuotationStatus_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _QuotationStatus): QuotationStatus {
+    return from_candid_variant_n22(_uploadFile, _downloadFile, value);
 }
-function from_candid_Quotation_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Quotation): Quotation {
-    return from_candid_record_n18(_uploadFile, _downloadFile, value);
+function from_candid_Quotation_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Quotation): Quotation {
+    return from_candid_record_n20(_uploadFile, _downloadFile, value);
 }
-function from_candid_UserRole_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
-    return from_candid_variant_n25(_uploadFile, _downloadFile, value);
+function from_candid_UserRole_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
+    return from_candid_variant_n27(_uploadFile, _downloadFile, value);
 }
-function from_candid_User_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _User): User {
-    return from_candid_record_n23(_uploadFile, _downloadFile, value);
+function from_candid_User_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _User): User {
+    return from_candid_record_n25(_uploadFile, _downloadFile, value);
 }
-function from_candid_record_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_opt_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Project]): Project | null {
+    return value.length === 0 ? null : from_candid_Project_n10(_uploadFile, _downloadFile, value[0]);
+}
+function from_candid_record_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
     installationType: {
         sheetMetal: null;
@@ -525,16 +661,16 @@ function from_candid_record_n10(_uploadFile: (file: ExternalBlob) => Promise<Uin
 } {
     return {
         id: value.id,
-        installationType: from_candid_variant_n11(_uploadFile, _downloadFile, value.installationType),
-        status: from_candid_ProjectStatus_n12(_uploadFile, _downloadFile, value.status),
+        installationType: from_candid_variant_n12(_uploadFile, _downloadFile, value.installationType),
+        status: from_candid_ProjectStatus_n13(_uploadFile, _downloadFile, value.status),
         batteryCapacityKWh: value.batteryCapacityKWh,
         clientName: value.clientName,
-        loadInputMethod: from_candid_variant_n14(_uploadFile, _downloadFile, value.loadInputMethod),
+        loadInputMethod: from_candid_variant_n15(_uploadFile, _downloadFile, value.loadInputMethod),
         systemSizeKW: value.systemSizeKW,
-        systemType: from_candid_variant_n15(_uploadFile, _downloadFile, value.systemType)
+        systemType: from_candid_variant_n16(_uploadFile, _downloadFile, value.systemType)
     };
 }
-function from_candid_record_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
     gst: number;
     irr: number;
@@ -567,7 +703,7 @@ function from_candid_record_n18(_uploadFile: (file: ExternalBlob) => Promise<Uin
         id: value.id,
         gst: value.gst,
         irr: value.irr,
-        status: from_candid_QuotationStatus_n19(_uploadFile, _downloadFile, value.status),
+        status: from_candid_QuotationStatus_n21(_uploadFile, _downloadFile, value.status),
         subsidy: value.subsidy,
         clientName: value.clientName,
         paybackYears: value.paybackYears,
@@ -579,7 +715,7 @@ function from_candid_record_n18(_uploadFile: (file: ExternalBlob) => Promise<Uin
         companyName: value.companyName
     };
 }
-function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
     name: string;
     role: _UserRole;
@@ -595,12 +731,12 @@ function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promise<Uin
     return {
         id: value.id,
         name: value.name,
-        role: from_candid_UserRole_n24(_uploadFile, _downloadFile, value.role),
+        role: from_candid_UserRole_n26(_uploadFile, _downloadFile, value.role),
         isActive: value.isActive,
         email: value.email
     };
 }
-function from_candid_variant_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     sheetMetal: null;
 } | {
     rccRooftop: null;
@@ -611,7 +747,7 @@ function from_candid_variant_n11(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): Variant_sheetMetal_rccRooftop_other_groundMount {
     return "sheetMetal" in value ? Variant_sheetMetal_rccRooftop_other_groundMount.sheetMetal : "rccRooftop" in value ? Variant_sheetMetal_rccRooftop_other_groundMount.rccRooftop : "other" in value ? Variant_sheetMetal_rccRooftop_other_groundMount.other : "groundMount" in value ? Variant_sheetMetal_rccRooftop_other_groundMount.groundMount : value;
 }
-function from_candid_variant_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     completed: null;
 } | {
     approved: null;
@@ -624,14 +760,14 @@ function from_candid_variant_n13(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): ProjectStatus {
     return "completed" in value ? ProjectStatus.completed : "approved" in value ? ProjectStatus.approved : "quoted" in value ? ProjectStatus.quoted : "draft" in value ? ProjectStatus.draft : "inProgress" in value ? ProjectStatus.inProgress : value;
 }
-function from_candid_variant_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     applianceBased: null;
 } | {
     consumptionBased: null;
 }): Variant_applianceBased_consumptionBased {
     return "applianceBased" in value ? Variant_applianceBased_consumptionBased.applianceBased : "consumptionBased" in value ? Variant_applianceBased_consumptionBased.consumptionBased : value;
 }
-function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     hybrid: null;
 } | {
     offGrid: null;
@@ -640,7 +776,7 @@ function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): Variant_hybrid_offGrid_onGrid {
     return "hybrid" in value ? Variant_hybrid_offGrid_onGrid.hybrid : "offGrid" in value ? Variant_hybrid_offGrid_onGrid.offGrid : "onGrid" in value ? Variant_hybrid_offGrid_onGrid.onGrid : value;
 }
-function from_candid_variant_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     sent: null;
 } | {
     rejected: null;
@@ -651,7 +787,7 @@ function from_candid_variant_n20(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): QuotationStatus {
     return "sent" in value ? QuotationStatus.sent : "rejected" in value ? QuotationStatus.rejected : "accepted" in value ? QuotationStatus.accepted : "draft" in value ? QuotationStatus.draft : value;
 }
-function from_candid_variant_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     admin: null;
 } | {
     owner: null;
@@ -662,20 +798,23 @@ function from_candid_variant_n25(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): UserRole {
     return "admin" in value ? UserRole.admin : "owner" in value ? UserRole.owner : "procurement" in value ? UserRole.procurement : "siteEngineer" in value ? UserRole.siteEngineer : value;
 }
-function from_candid_vec_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Quotation>): Array<Quotation> {
-    return value.map((x)=>from_candid_Quotation_n17(_uploadFile, _downloadFile, x));
+function from_candid_vec_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Project>): Array<Project> {
+    return value.map((x)=>from_candid_Project_n10(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_User>): Array<User> {
-    return value.map((x)=>from_candid_User_n22(_uploadFile, _downloadFile, x));
+function from_candid_vec_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Quotation>): Array<Quotation> {
+    return value.map((x)=>from_candid_Quotation_n19(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Project>): Array<Project> {
-    return value.map((x)=>from_candid_Project_n9(_uploadFile, _downloadFile, x));
+function from_candid_vec_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_User>): Array<User> {
+    return value.map((x)=>from_candid_User_n24(_uploadFile, _downloadFile, x));
 }
 function to_candid_QuotationStatus_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: QuotationStatus): _QuotationStatus {
     return to_candid_variant_n5(_uploadFile, _downloadFile, value);
 }
 function to_candid_UserRole_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
     return to_candid_variant_n7(_uploadFile, _downloadFile, value);
+}
+function to_candid_opt_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: bigint | null): [] | [bigint] {
+    return value === null ? candid_none() : candid_some(value);
 }
 function to_candid_variant_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Variant_hybrid_offGrid_onGrid): {
     hybrid: null;

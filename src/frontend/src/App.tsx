@@ -8,14 +8,18 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import {
   Battery,
+  BookOpen,
   ClipboardList,
+  Database,
   FileText,
   FolderOpen,
+  Hammer,
   LayoutDashboard,
   Menu,
   Package,
   Settings,
   Shield,
+  ShoppingCart,
   Sun,
   Users,
   X,
@@ -27,12 +31,16 @@ import { BrandCatalog } from "./components/BrandCatalog";
 import { Dashboard } from "./components/Dashboard";
 import { InventoryPage } from "./components/InventoryPage";
 import { MOQManagerPage } from "./components/MOQManagerPage";
+import { MaterialConsumedPage } from "./components/MaterialConsumedPage";
+import { ProcurementPage } from "./components/ProcurementPage";
+import { ProductMasterPage } from "./components/ProductMasterPage";
 import { ProjectWizard } from "./components/ProjectWizard";
 import { ProjectsPage } from "./components/ProjectsPage";
 import { QuotationsPage } from "./components/QuotationsPage";
 import { SettingsSheet } from "./components/SettingsSheet";
 import { SiteExecution } from "./components/SiteExecution";
 import { UsersPage } from "./components/UsersPage";
+import { VendorLedgerPage } from "./components/VendorLedgerPage";
 
 type Page =
   | "dashboard"
@@ -44,7 +52,11 @@ type Page =
   | "users"
   | "audit"
   | "quotations"
-  | "moqManager";
+  | "moqManager"
+  | "procurement"
+  | "vendorLedger"
+  | "materialConsumed"
+  | "productMaster";
 
 const NAV_ITEMS: {
   id: Page;
@@ -63,25 +75,76 @@ const NAV_ITEMS: {
     group: "operations",
   },
   { id: "brands", label: "Brand Catalog", icon: Battery, group: "operations" },
+  {
+    id: "productMaster",
+    label: "Product Master",
+    icon: Database,
+    group: "operations",
+  },
   { id: "execution", label: "Site Execution", icon: Zap, group: "operations" },
+  {
+    id: "procurement",
+    label: "Procurement",
+    icon: ShoppingCart,
+    group: "operations",
+  },
+  {
+    id: "vendorLedger",
+    label: "Vendor Ledger",
+    icon: BookOpen,
+    group: "operations",
+  },
+  {
+    id: "materialConsumed",
+    label: "Material Consumed",
+    icon: Hammer,
+    group: "operations",
+  },
   { id: "users", label: "Users", icon: Users, group: "admin" },
   { id: "audit", label: "Audit Log", icon: Shield, group: "admin" },
 ];
+
+// Items hidden per role
+function filterNavForRole(role: string, items: typeof NAV_ITEMS) {
+  return items.filter((item) => {
+    if (role === "siteEngineer") {
+      // Hide vendor ledger, procurement, admin pages, and product master
+      if (
+        item.id === "vendorLedger" ||
+        item.id === "procurement" ||
+        item.id === "users" ||
+        item.id === "audit" ||
+        item.id === "productMaster"
+      )
+        return false;
+    }
+    if (role === "procurement") {
+      // Hide material consumed and product master
+      if (item.id === "materialConsumed" || item.id === "productMaster")
+        return false;
+    }
+    return true;
+  });
+}
 
 function Sidebar({
   page,
   onNavigate,
   collapsed,
+  activeRole,
 }: {
   page: Page;
   onNavigate: (p: Page) => void;
   collapsed: boolean;
+  activeRole: string;
 }) {
   const groups = [
     { id: "main", label: "Core" },
     { id: "operations", label: "Operations" },
     { id: "admin", label: "Admin" },
   ];
+
+  const visibleItems = filterNavForRole(activeRole, NAV_ITEMS);
 
   return (
     <aside
@@ -98,12 +161,10 @@ function Sidebar({
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="text-sm font-bold text-sidebar-foreground leading-tight truncate font-display">
+            <p className="text-sm font-bold text-white leading-tight truncate font-display">
               Solar EPC Pro
             </p>
-            <p className="text-xs text-sidebar-foreground/50 truncate">
-              v2.0 Platform
-            </p>
+            <p className="text-xs text-white/50 truncate">v2.0 Platform</p>
           </div>
         )}
       </div>
@@ -111,11 +172,11 @@ function Sidebar({
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-3 space-y-4">
         {groups.map((group) => {
-          const items = NAV_ITEMS.filter((n) => n.group === group.id);
+          const items = visibleItems.filter((n) => n.group === group.id);
           return (
             <div key={group.id}>
               {!collapsed && (
-                <p className="px-3 mb-1 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+                <p className="px-3 mb-1 text-xs font-semibold text-white/60 uppercase tracking-wider">
                   {group.label}
                 </p>
               )}
@@ -133,13 +194,13 @@ function Sidebar({
                         ${
                           active
                             ? "bg-solar text-navy font-semibold shadow-yellow-glow"
-                            : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                            : "text-white hover:bg-sidebar-accent hover:text-white"
                         }
                       `}
                       title={collapsed ? item.label : undefined}
                     >
                       <item.icon
-                        className={`h-4 w-4 flex-shrink-0 ${active ? "text-navy" : "text-sidebar-foreground/50"}`}
+                        className={`h-4 w-4 flex-shrink-0 ${active ? "text-navy" : "text-white/70"}`}
                       />
                       {!collapsed && (
                         <span className="truncate">{item.label}</span>
@@ -156,7 +217,7 @@ function Sidebar({
       {/* Footer */}
       {!collapsed && (
         <div className="p-3 border-t border-sidebar-border">
-          <p className="text-xs text-sidebar-foreground/40 text-center leading-relaxed">
+          <p className="text-xs text-white/40 text-center leading-relaxed">
             © {new Date().getFullYear()}.{" "}
             <a
               href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
@@ -177,7 +238,7 @@ export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [_selectedProjectId, setSelectedProjectId] = useState<bigint | null>(
+  const [selectedProjectId, setSelectedProjectId] = useState<bigint | null>(
     null,
   );
   const [activeRole, setActiveRole] = useState<string>(() => {
@@ -212,14 +273,23 @@ export default function App() {
               setPage("wizard");
             }}
             onSelectProject={handleSelectProject}
+            onEditProject={(id) => {
+              setSelectedProjectId(id);
+              setPage("wizard");
+            }}
           />
         );
       case "wizard":
-        return <ProjectWizard onComplete={() => setPage("projects")} />;
+        return (
+          <ProjectWizard
+            onComplete={() => setPage("projects")}
+            editProjectId={selectedProjectId ?? undefined}
+          />
+        );
       case "inventory":
         return <InventoryPage />;
       case "moqManager":
-        return <MOQManagerPage />;
+        return <MOQManagerPage activeRole={activeRole} />;
       case "brands":
         return <BrandCatalog />;
       case "execution":
@@ -230,6 +300,14 @@ export default function App() {
         return <AuditLogPage />;
       case "quotations":
         return <QuotationsPage activeRole={activeRole} />;
+      case "procurement":
+        return <ProcurementPage activeRole={activeRole} />;
+      case "vendorLedger":
+        return <VendorLedgerPage activeRole={activeRole} />;
+      case "materialConsumed":
+        return <MaterialConsumedPage activeRole={activeRole} />;
+      case "productMaster":
+        return <ProductMasterPage activeRole={activeRole} />;
       default:
         return <Dashboard onNavigate={navigate} />;
     }
@@ -243,6 +321,7 @@ export default function App() {
           page={page}
           onNavigate={(p) => setPage(p)}
           collapsed={sidebarCollapsed}
+          activeRole={activeRole}
         />
       </div>
 
@@ -259,7 +338,12 @@ export default function App() {
             aria-label="Close menu"
           />
           <div className="relative z-10 h-full">
-            <Sidebar page={page} onNavigate={navigate} collapsed={false} />
+            <Sidebar
+              page={page}
+              onNavigate={navigate}
+              collapsed={false}
+              activeRole={activeRole}
+            />
           </div>
           <button
             type="button"
@@ -297,7 +381,9 @@ export default function App() {
           <div className="flex-1 min-w-0">
             <h2 className="text-sm font-semibold text-foreground truncate capitalize font-display">
               {page === "wizard"
-                ? "New Project Wizard"
+                ? selectedProjectId
+                  ? "Edit Project"
+                  : "New Project Wizard"
                 : (NAV_ITEMS.find((n) => n.id === page)?.label ?? "Dashboard")}
             </h2>
           </div>

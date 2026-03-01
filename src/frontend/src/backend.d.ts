@@ -52,6 +52,19 @@ export interface User {
     isActive: boolean;
     email: string;
 }
+export interface ProductMaster {
+    id: bigint;
+    voltage: string;
+    efficiency: number;
+    unit: string;
+    pricePerUnit: number;
+    productType: string;
+    isActive: boolean;
+    warrantyYears: bigint;
+    category: string;
+    brand: string;
+    capacity: string;
+}
 export interface AuditEntry {
     id: bigint;
     action: string;
@@ -116,17 +129,25 @@ export interface backendInterface {
     addMOQItem(projectId: bigint, itemName: string, category: string, quantity: number, unit: string, brand: string, unitPrice: number): Promise<bigint>;
     createBrand(category: string, name: string, isActive: boolean): Promise<bigint>;
     createInventoryItem(sku: string, name: string, category: string, quantityOnHand: bigint, minStock: bigint, unit: string, warehouseLocation: string): Promise<bigint>;
+    createProductMaster(category: string, brand: string, productType: string, capacity: string, voltage: string, pricePerUnit: number, unit: string, efficiency: number, warrantyYears: bigint, isActive: boolean): Promise<bigint>;
     createProject(clientName: string, systemType: Variant_hybrid_offGrid_onGrid, installationType: Variant_sheetMetal_rccRooftop_other_groundMount, loadInputMethod: Variant_applianceBased_consumptionBased, systemSizeKW: number, batteryCapacityKWh: number): Promise<bigint>;
     createQuotation(proposalNumber: string, clientName: string, companyName: string, gst: number, totalCost: number, subsidy: number, paybackYears: number, annualSavings: number, irr: number, carbonSavings: number, status: QuotationStatus, termsAndConditions: string): Promise<bigint>;
     createUser(name: string, email: string, role: UserRole, isActive: boolean): Promise<bigint>;
     deleteMOQItem(id: bigint): Promise<void>;
+    deleteProductMaster(id: bigint): Promise<void>;
     generateMOQ(projectId: bigint): Promise<void>;
+    generateMOQWithProducts(projectId: bigint, panelProductId: bigint | null, inverterProductId: bigint | null, batteryProductId: bigint | null, cableProductId: bigint | null, structureProductId: bigint | null): Promise<void>;
     getAuditLog(): Promise<Array<AuditEntry>>;
+    getProject(id: bigint): Promise<Project | null>;
     listBrands(): Promise<Array<Brand>>;
     listInventory(): Promise<Array<InventoryItem>>;
     listMOQ(projectId: bigint): Promise<Array<MOQItem>>;
+    listProductMaster(): Promise<Array<ProductMaster>>;
+    listProductMasterByCategory(category: string): Promise<Array<ProductMaster>>;
     listProjects(): Promise<Array<Project>>;
     listQuotations(): Promise<Array<Quotation>>;
     listUsers(): Promise<Array<User>>;
     updateMOQItem(id: bigint, itemName: string, category: string, quantity: number, unit: string, brand: string, unitPrice: number): Promise<void>;
+    updateProductMaster(id: bigint, category: string, brand: string, productType: string, capacity: string, voltage: string, pricePerUnit: number, unit: string, efficiency: number, warrantyYears: bigint, isActive: boolean): Promise<void>;
+    updateProject(id: bigint, clientName: string, systemType: Variant_hybrid_offGrid_onGrid, installationType: Variant_sheetMetal_rccRooftop_other_groundMount, systemSizeKW: number, batteryCapacityKWh: number): Promise<void>;
 }

@@ -28,7 +28,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   ClipboardList,
+  FileSpreadsheet,
   IndianRupee,
   Loader2,
   PackagePlus,
@@ -43,8 +50,11 @@ import {
   useDeleteMOQItem,
   useMOQ,
   useProjects,
+  useQuotations,
   useUpdateMOQItemFull,
 } from "../hooks/useQueries";
+import { exportMOQToExcel } from "../utils/exportMOQExcel";
+import { getAllOverrides } from "../utils/quotationOverrides";
 
 const CATEGORIES = [
   "Solar PV",
@@ -597,8 +607,9 @@ function MOQCategorySection({
   );
 }
 
-export function MOQManagerPage() {
+export function MOQManagerPage({ activeRole }: { activeRole?: string }) {
   const { data: projects, isLoading: projectsLoading } = useProjects();
+  const { data: quotations } = useQuotations();
   const [selectedProjectId, setSelectedProjectId] = useState<bigint | null>(
     null,
   );
@@ -607,6 +618,32 @@ export function MOQManagerPage() {
   const updateMOQItem = useUpdateMOQItemFull();
 
   const selectedProject = projects?.find((p) => p.id === selectedProjectId);
+
+  // Check if any quotation for the selected project is clientApproved
+  const overrides = getAllOverrides();
+  const isProjectQuotationApproved = (() => {
+    if (!selectedProject || !quotations) return false;
+    return quotations.some((q) => {
+      if (q.clientName !== selectedProject.clientName) return false;
+      const ov = overrides[q.id.toString()];
+      return ov?.status === "clientApproved";
+    });
+  })();
+
+  const handleExportExcel = () => {
+    if (!selectedProject || !moqItems || moqItems.length === 0) return;
+    try {
+      exportMOQToExcel(selectedProject, moqItems);
+      toast.success(
+        `Excel exported: MOQ_${selectedProject.clientName.replace(/\s+/g, "_")}`,
+      );
+    } catch (err) {
+      console.error("Excel export error:", err);
+      toast.error("Failed to export Excel");
+    }
+  };
+
+  void activeRole; // Available for future role-based UI gating if needed
 
   const moqByCategory =
     moqItems?.reduce(
@@ -651,196 +688,238 @@ export function MOQManagerPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl">
-      {/* Page header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold font-display flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-navy text-white">
-              <ClipboardList className="h-5 w-5" />
-            </div>
-            MOQ Manager
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            View and edit Material Order Quantities for all projects. Add items,
-            update prices, specs, and brand assignments.
-          </p>
-        </div>
-        {selectedProjectId !== null && (
-          <AddItemDialog
-            projectId={selectedProjectId}
-            onAdded={() => {
-              // React Query handles re-fetch via cache invalidation
-            }}
-          />
-        )}
-      </div>
-
-      {/* Project selector */}
-      <Card className="border-border shadow-sm">
-        <CardHeader className="pb-3 pt-4 px-4">
-          <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-            Select Project
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4">
-          {projectsLoading ? (
-            <Skeleton className="h-10 w-full max-w-md" />
-          ) : !projects || projects.length === 0 ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-              <ClipboardList className="h-4 w-4" />
-              No projects found. Create a project via the Project Wizard first.
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 flex-wrap">
-              <Select
-                value={selectedProjectId?.toString() ?? ""}
-                onValueChange={(v) => setSelectedProjectId(BigInt(v))}
-              >
-                <SelectTrigger className="w-full max-w-md h-10">
-                  <SelectValue placeholder="Choose a project to manage its MOQ..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id.toString()} value={p.id.toString()}>
-                      <span className="font-medium">{p.clientName}</span>
-                      <span className="text-muted-foreground ml-2 text-xs">
-                        — {p.systemSizeKW.toFixed(1)} kWp |{" "}
-                        {p.systemType === "onGrid"
-                          ? "On-Grid"
-                          : p.systemType === "offGrid"
-                            ? "Off-Grid"
-                            : "Hybrid"}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {selectedProject && (
-                <div className="flex gap-2 flex-wrap">
-                  <Badge className="bg-solar/20 text-solar-dark border border-solar/40 text-xs font-semibold">
-                    {selectedProject.systemSizeKW.toFixed(1)} kWp
-                  </Badge>
-                  <Badge className="bg-navy/10 text-navy border border-navy/20 text-xs">
-                    {selectedProject.systemType === "onGrid"
-                      ? "On-Grid"
-                      : selectedProject.systemType === "offGrid"
-                        ? "Off-Grid"
-                        : "Hybrid"}
-                  </Badge>
-                  <Badge className="bg-secondary text-secondary-foreground border border-border text-xs">
-                    {selectedProject.installationType === "rccRooftop"
-                      ? "RCC Rooftop"
-                      : selectedProject.installationType === "sheetMetal"
-                        ? "Sheet Metal"
-                        : selectedProject.installationType === "groundMount"
-                          ? "Ground Mount"
-                          : "Other"}
-                  </Badge>
-                </div>
-              )}
+    <TooltipProvider>
+      <div className="space-y-6 max-w-7xl">
+        {/* Page header */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold font-display flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-navy text-white">
+                <ClipboardList className="h-5 w-5" />
+              </div>
+              MOQ Manager
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              View and edit Material Order Quantities for all projects. Add
+              items, update prices, specs, and brand assignments.
+            </p>
+          </div>
+          {selectedProjectId !== null && (
+            <div className="flex items-center gap-2">
+              {/* Export Excel — locked until a quotation for this project is approved */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`gap-2 ${
+                        isProjectQuotationApproved
+                          ? "border-emerald-400 text-emerald-700 hover:bg-emerald-50"
+                          : "opacity-50 cursor-not-allowed"
+                      }`}
+                      disabled={
+                        !isProjectQuotationApproved ||
+                        !moqItems ||
+                        moqItems.length === 0
+                      }
+                      onClick={handleExportExcel}
+                      aria-label="Export MOQ to Excel"
+                    >
+                      <FileSpreadsheet className="h-4 w-4" />
+                      Export Excel
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {isProjectQuotationApproved ? (
+                    <p>Export MOQ as Excel spreadsheet</p>
+                  ) : (
+                    <p>Approve a quotation first to unlock Excel export</p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+              <AddItemDialog
+                projectId={selectedProjectId}
+                onAdded={() => {
+                  // React Query handles re-fetch via cache invalidation
+                }}
+              />
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* MOQ content */}
-      {selectedProjectId === null ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="p-4 rounded-2xl bg-navy/8 mb-4">
-            <ClipboardList className="h-10 w-10 text-navy/40" />
-          </div>
-          <p className="text-base font-semibold text-foreground/60">
-            No project selected
-          </p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-            Select a project above to view and edit its Bill of Materials (MOQ).
-          </p>
-        </div>
-      ) : moqLoading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((k) => (
-            <div
-              key={k}
-              className="rounded-xl border border-border overflow-hidden"
-            >
-              <div className="h-10 bg-muted/30 border-b border-border" />
-              {[1, 2, 3].map((r) => (
-                <div key={r} className="flex gap-3 p-3 border-b border-border">
-                  <Skeleton className="h-7 flex-1" />
-                  <Skeleton className="h-7 w-24" />
-                  <Skeleton className="h-7 w-20" />
-                  <Skeleton className="h-7 w-16" />
-                  <Skeleton className="h-7 w-14" />
-                  <Skeleton className="h-7 w-20" />
-                  <Skeleton className="h-7 w-20" />
-                  <Skeleton className="h-7 w-16" />
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      ) : !moqItems || moqItems.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border rounded-2xl">
-          <div className="p-4 rounded-2xl bg-solar/10 mb-4">
-            <ClipboardList className="h-10 w-10 text-solar-dark/50" />
-          </div>
-          <p className="text-base font-semibold text-foreground/70">
-            No MOQ items found
-          </p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-            This project has no Bill of Materials yet. Generate the MOQ via the
-            Project Wizard or add items manually.
-          </p>
-          <div className="mt-4">
-            <AddItemDialog projectId={selectedProjectId} onAdded={() => {}} />
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {/* Hint text */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-solar/8 border border-solar/25 rounded-lg px-4 py-2.5">
-            <Save className="h-3.5 w-3.5 text-solar-dark" />
-            <span>
-              Edit any field inline. A{" "}
-              <strong className="text-navy">Save</strong> button appears when a
-              row has unsaved changes. Hover a row to reveal Delete.
-            </span>
-          </div>
+        {/* Project selector */}
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Select Project
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            {projectsLoading ? (
+              <Skeleton className="h-10 w-full max-w-md" />
+            ) : !projects || projects.length === 0 ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                <ClipboardList className="h-4 w-4" />
+                No projects found. Create a project via the Project Wizard
+                first.
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 flex-wrap">
+                <Select
+                  value={selectedProjectId?.toString() ?? ""}
+                  onValueChange={(v) => setSelectedProjectId(BigInt(v))}
+                >
+                  <SelectTrigger className="w-full max-w-md h-10">
+                    <SelectValue placeholder="Choose a project to manage its MOQ..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id.toString()} value={p.id.toString()}>
+                        <span className="font-medium">{p.clientName}</span>
+                        <span className="text-muted-foreground ml-2 text-xs">
+                          — {p.systemSizeKW.toFixed(1)} kWp |{" "}
+                          {p.systemType === "onGrid"
+                            ? "On-Grid"
+                            : p.systemType === "offGrid"
+                              ? "Off-Grid"
+                              : "Hybrid"}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-          {/* Category sections */}
-          {Object.entries(moqByCategory).map(([category, items]) => (
-            <MOQCategorySection
-              key={category}
-              category={category}
-              items={items}
-              onDelete={handleDelete}
-              onSave={handleSave}
-            />
-          ))}
+                {selectedProject && (
+                  <div className="flex gap-2 flex-wrap">
+                    <Badge className="bg-solar/20 text-solar-dark border border-solar/40 text-xs font-semibold">
+                      {selectedProject.systemSizeKW.toFixed(1)} kWp
+                    </Badge>
+                    <Badge className="bg-navy/10 text-navy border border-navy/20 text-xs">
+                      {selectedProject.systemType === "onGrid"
+                        ? "On-Grid"
+                        : selectedProject.systemType === "offGrid"
+                          ? "Off-Grid"
+                          : "Hybrid"}
+                    </Badge>
+                    <Badge className="bg-secondary text-secondary-foreground border border-border text-xs">
+                      {selectedProject.installationType === "rccRooftop"
+                        ? "RCC Rooftop"
+                        : selectedProject.installationType === "sheetMetal"
+                          ? "Sheet Metal"
+                          : selectedProject.installationType === "groundMount"
+                            ? "Ground Mount"
+                            : "Other"}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Grand total */}
-          <div className="rounded-xl border border-navy/20 bg-navy px-6 py-4 flex items-center justify-between shadow-md">
-            <div>
-              <p className="text-xs font-semibold text-white/60 uppercase tracking-wider">
-                Total Material Cost
-              </p>
-              <p className="text-xs text-white/40 mt-0.5">
-                Exclusive of GST &middot; {moqItems.length} item
-                {moqItems.length !== 1 ? "s" : ""} across{" "}
-                {Object.keys(moqByCategory).length} categories
-              </p>
+        {/* MOQ content */}
+        {selectedProjectId === null ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="p-4 rounded-2xl bg-navy/8 mb-4">
+              <ClipboardList className="h-10 w-10 text-navy/40" />
             </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-solar tabular-nums">
-                ₹{Math.round(totalMOQCost).toLocaleString()}
-              </p>
-              <p className="text-xs text-white/40 mt-0.5">Ex-GST</p>
+            <p className="text-base font-semibold text-foreground/60">
+              No project selected
+            </p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+              Select a project above to view and edit its Bill of Materials
+              (MOQ).
+            </p>
+          </div>
+        ) : moqLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((k) => (
+              <div
+                key={k}
+                className="rounded-xl border border-border overflow-hidden"
+              >
+                <div className="h-10 bg-muted/30 border-b border-border" />
+                {[1, 2, 3].map((r) => (
+                  <div
+                    key={r}
+                    className="flex gap-3 p-3 border-b border-border"
+                  >
+                    <Skeleton className="h-7 flex-1" />
+                    <Skeleton className="h-7 w-24" />
+                    <Skeleton className="h-7 w-20" />
+                    <Skeleton className="h-7 w-16" />
+                    <Skeleton className="h-7 w-14" />
+                    <Skeleton className="h-7 w-20" />
+                    <Skeleton className="h-7 w-20" />
+                    <Skeleton className="h-7 w-16" />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : !moqItems || moqItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border rounded-2xl">
+            <div className="p-4 rounded-2xl bg-solar/10 mb-4">
+              <ClipboardList className="h-10 w-10 text-solar-dark/50" />
+            </div>
+            <p className="text-base font-semibold text-foreground/70">
+              No MOQ items found
+            </p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+              This project has no Bill of Materials yet. Generate the MOQ via
+              the Project Wizard or add items manually.
+            </p>
+            <div className="mt-4">
+              <AddItemDialog projectId={selectedProjectId} onAdded={() => {}} />
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Hint text */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-solar/8 border border-solar/25 rounded-lg px-4 py-2.5">
+              <Save className="h-3.5 w-3.5 text-solar-dark" />
+              <span>
+                Edit any field inline. A{" "}
+                <strong className="text-navy">Save</strong> button appears when
+                a row has unsaved changes. Hover a row to reveal Delete.
+              </span>
+            </div>
+
+            {/* Category sections */}
+            {Object.entries(moqByCategory).map(([category, items]) => (
+              <MOQCategorySection
+                key={category}
+                category={category}
+                items={items}
+                onDelete={handleDelete}
+                onSave={handleSave}
+              />
+            ))}
+
+            {/* Grand total */}
+            <div className="rounded-xl border border-navy/20 bg-navy px-6 py-4 flex items-center justify-between shadow-md">
+              <div>
+                <p className="text-xs font-semibold text-white/60 uppercase tracking-wider">
+                  Total Material Cost
+                </p>
+                <p className="text-xs text-white/40 mt-0.5">
+                  Exclusive of GST &middot; {moqItems.length} item
+                  {moqItems.length !== 1 ? "s" : ""} across{" "}
+                  {Object.keys(moqByCategory).length} categories
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-solar tabular-nums">
+                  ₹{Math.round(totalMOQCost).toLocaleString()}
+                </p>
+                <p className="text-xs text-white/40 mt-0.5">Ex-GST</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

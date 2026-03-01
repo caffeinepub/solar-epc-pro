@@ -8,6 +8,7 @@ import {
   ChevronRight,
   FolderOpen,
   MapPin,
+  Pencil,
   Plus,
   Search,
   Zap,
@@ -49,9 +50,11 @@ const systemTypeColors: Record<string, string> = {
 function ProjectCard({
   project,
   onSelect,
+  onEdit,
 }: {
   project: Project;
   onSelect: (id: bigint) => void;
+  onEdit: (id: bigint) => void;
 }) {
   return (
     <Card className="hover:border-solar/50 transition-all cursor-pointer group shadow-blue-sm">
@@ -97,13 +100,27 @@ function ProjectCard({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onSelect(project.id)}
-            className="flex-shrink-0 p-1.5 rounded-md hover:bg-solar/20 text-muted-foreground hover:text-navy transition-colors"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(project.id);
+              }}
+              title="Edit project"
+              className="p-1.5 rounded-md hover:bg-blue-50 text-muted-foreground hover:text-navy transition-colors"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelect(project.id)}
+              title="View project"
+              className="p-1.5 rounded-md hover:bg-solar/20 text-muted-foreground hover:text-navy transition-colors"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -113,9 +130,11 @@ function ProjectCard({
 export function ProjectsPage({
   onNewProject,
   onSelectProject,
+  onEditProject,
 }: {
   onNewProject: () => void;
   onSelectProject: (id: bigint) => void;
+  onEditProject: (id: bigint) => void;
 }) {
   const { data: projects, isLoading } = useProjects();
   const [search, setSearch] = useState("");
@@ -225,6 +244,7 @@ export function ProjectsPage({
               key={project.id.toString()}
               project={project}
               onSelect={onSelectProject}
+              onEdit={onEditProject}
             />
           ))}
         </div>

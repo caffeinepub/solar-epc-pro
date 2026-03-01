@@ -4,6 +4,7 @@ import type {
   Brand,
   InventoryItem,
   MOQItem,
+  ProductMaster,
   Project,
   Quotation,
   User,
@@ -33,6 +34,7 @@ export type {
   User,
   AuditEntry,
   MOQItem,
+  ProductMaster,
 };
 
 export function useProjects() {
@@ -47,6 +49,18 @@ export function useProjects() {
   });
 }
 
+export function useGetProject(id: bigint | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Project | null>({
+    queryKey: ["project", id?.toString()],
+    queryFn: async () => {
+      if (!actor || id === null) return null;
+      return actor.getProject(id);
+    },
+    enabled: !!actor && !isFetching && id !== null,
+  });
+}
+
 export function useBrands() {
   const { actor, isFetching } = useActor();
   return useQuery<Brand[]>({
@@ -56,6 +70,9 @@ export function useBrands() {
       return actor.listBrands();
     },
     enabled: !!actor && !isFetching,
+    retry: 2,
+    retryDelay: 1500,
+    staleTime: 30_000,
   });
 }
 
@@ -402,6 +419,120 @@ export function useAddAuditEntry() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auditLog"] });
+    },
+  });
+}
+
+// ─── Product Master hooks ─────────────────────────────────────────────────────
+
+export function useProductMaster() {
+  const { actor, isFetching } = useActor();
+  return useQuery<ProductMaster[]>({
+    queryKey: ["productMaster"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listProductMaster();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useProductMasterByCategory(category: string) {
+  const { actor, isFetching } = useActor();
+  return useQuery<ProductMaster[]>({
+    queryKey: ["productMaster", category],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listProductMasterByCategory(category);
+    },
+    enabled: !!actor && !isFetching && !!category,
+  });
+}
+
+export function useCreateProductMaster() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      category: string;
+      brand: string;
+      productType: string;
+      capacity: string;
+      voltage: string;
+      pricePerUnit: number;
+      unit: string;
+      efficiency: number;
+      warrantyYears: bigint;
+      isActive: boolean;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.createProductMaster(
+        args.category,
+        args.brand,
+        args.productType,
+        args.capacity,
+        args.voltage,
+        args.pricePerUnit,
+        args.unit,
+        args.efficiency,
+        args.warrantyYears,
+        args.isActive,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["productMaster"] });
+    },
+  });
+}
+
+export function useUpdateProductMaster() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: {
+      id: bigint;
+      category: string;
+      brand: string;
+      productType: string;
+      capacity: string;
+      voltage: string;
+      pricePerUnit: number;
+      unit: string;
+      efficiency: number;
+      warrantyYears: bigint;
+      isActive: boolean;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.updateProductMaster(
+        args.id,
+        args.category,
+        args.brand,
+        args.productType,
+        args.capacity,
+        args.voltage,
+        args.pricePerUnit,
+        args.unit,
+        args.efficiency,
+        args.warrantyYears,
+        args.isActive,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["productMaster"] });
+    },
+  });
+}
+
+export function useDeleteProductMaster() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("No actor");
+      return actor.deleteProductMaster(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["productMaster"] });
     },
   });
 }

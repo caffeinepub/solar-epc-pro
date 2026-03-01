@@ -46,6 +46,19 @@ export interface MOQItem {
   'unitPrice' : number,
   'totalPrice' : number,
 }
+export interface ProductMaster {
+  'id' : bigint,
+  'voltage' : string,
+  'efficiency' : number,
+  'unit' : string,
+  'pricePerUnit' : number,
+  'productType' : string,
+  'isActive' : boolean,
+  'warrantyYears' : bigint,
+  'category' : string,
+  'brand' : string,
+  'capacity' : string,
+}
 export interface Project {
   'id' : bigint,
   'installationType' : { 'sheetMetal' : null } |
@@ -113,6 +126,21 @@ export interface _SERVICE {
     [string, string, string, bigint, bigint, string, string],
     bigint
   >,
+  'createProductMaster' : ActorMethod<
+    [
+      string,
+      string,
+      string,
+      string,
+      string,
+      number,
+      string,
+      number,
+      bigint,
+      boolean,
+    ],
+    bigint
+  >,
   'createProject' : ActorMethod<
     [
       string,
@@ -149,16 +177,63 @@ export interface _SERVICE {
   >,
   'createUser' : ActorMethod<[string, string, UserRole, boolean], bigint>,
   'deleteMOQItem' : ActorMethod<[bigint], undefined>,
+  'deleteProductMaster' : ActorMethod<[bigint], undefined>,
   'generateMOQ' : ActorMethod<[bigint], undefined>,
+  'generateMOQWithProducts' : ActorMethod<
+    [
+      bigint,
+      [] | [bigint],
+      [] | [bigint],
+      [] | [bigint],
+      [] | [bigint],
+      [] | [bigint],
+    ],
+    undefined
+  >,
   'getAuditLog' : ActorMethod<[], Array<AuditEntry>>,
+  'getProject' : ActorMethod<[bigint], [] | [Project]>,
   'listBrands' : ActorMethod<[], Array<Brand>>,
   'listInventory' : ActorMethod<[], Array<InventoryItem>>,
   'listMOQ' : ActorMethod<[bigint], Array<MOQItem>>,
+  'listProductMaster' : ActorMethod<[], Array<ProductMaster>>,
+  'listProductMasterByCategory' : ActorMethod<[string], Array<ProductMaster>>,
   'listProjects' : ActorMethod<[], Array<Project>>,
   'listQuotations' : ActorMethod<[], Array<Quotation>>,
   'listUsers' : ActorMethod<[], Array<User>>,
   'updateMOQItem' : ActorMethod<
     [bigint, string, string, number, string, string, number],
+    undefined
+  >,
+  'updateProductMaster' : ActorMethod<
+    [
+      bigint,
+      string,
+      string,
+      string,
+      string,
+      string,
+      number,
+      string,
+      number,
+      bigint,
+      boolean,
+    ],
+    undefined
+  >,
+  'updateProject' : ActorMethod<
+    [
+      bigint,
+      string,
+      { 'hybrid' : null } |
+        { 'offGrid' : null } |
+        { 'onGrid' : null },
+      { 'sheetMetal' : null } |
+        { 'rccRooftop' : null } |
+        { 'other' : null } |
+        { 'groundMount' : null },
+      number,
+      number,
+    ],
     undefined
   >,
 }
