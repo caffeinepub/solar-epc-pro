@@ -277,6 +277,7 @@ export default function App() {
               setSelectedProjectId(id);
               setPage("wizard");
             }}
+            activeRole={activeRole}
           />
         );
       case "wizard":

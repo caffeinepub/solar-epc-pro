@@ -88,7 +88,11 @@ function StatCard({
 export function Dashboard({
   onNavigate,
 }: { onNavigate: (page: string) => void }) {
-  const { data: projects, isLoading: projectsLoading } = useProjects();
+  const {
+    data: projects,
+    isLoading: projectsLoading,
+    isError: projectsError,
+  } = useProjects();
   const { data: inventory, isLoading: inventoryLoading } = useInventory();
   const { data: quotations } = useQuotations();
   const { data: auditLog } = useAuditLog();
@@ -111,6 +115,24 @@ export function Dashboard({
 
   return (
     <div className="space-y-6">
+      {/* Offline / error banner */}
+      {projectsError && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-amber-400/50 bg-amber-50 text-amber-800 text-sm">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-500" />
+          <span>
+            The backend is starting up or temporarily offline. Data will load
+            automatically when it's ready.{" "}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="underline font-semibold hover:text-amber-900"
+            >
+              Refresh
+            </button>
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="p-2 bg-solar rounded-lg shadow-yellow-glow">

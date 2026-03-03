@@ -1,3 +1,14 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,12 +22,14 @@ import {
   Pencil,
   Plus,
   Search,
+  Trash2,
   Zap,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { ProjectStatus } from "../backend.d";
 import type { Project } from "../backend.d";
-import { useProjects } from "../hooks/useQueries";
+import { useDeleteProject, useProjects } from "../hooks/useQueries";
 
 const statusColors: Record<string, string> = {
   [ProjectStatus.draft]: "bg-muted/70 text-muted-foreground border-transparent",
@@ -51,10 +64,14 @@ function ProjectCard({
   project,
   onSelect,
   onEdit,
+  onDelete,
+  isOwner,
 }: {
   project: Project;
   onSelect: (id: bigint) => void;
   onEdit: (id: bigint) => void;
+  onDelete: (id: bigint) => void;
+  isOwner: boolean;
 }) {
   return (
     <Card className="hover:border-solar/50 transition-all cursor-pointer group shadow-blue-sm">
@@ -112,6 +129,45 @@ function ProjectCard({
             >
               <Pencil className="h-4 w-4" />
             </button>
+
+            {isOwner && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    type="button"
+                    title="Delete project"
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Delete &ldquo;{project.clientName}&rdquo;?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently remove the project from your list.
+                      This cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(project.id);
+                      }}
+                      className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-600"
+                    >
+                      Delete Project
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
             <button
               type="button"
               onClick={() => onSelect(project.id)}
@@ -131,14 +187,30 @@ export function ProjectsPage({
   onNewProject,
   onSelectProject,
   onEditProject,
+  activeRole,
 }: {
   onNewProject: () => void;
   onSelectProject: (id: bigint) => void;
   onEditProject: (id: bigint) => void;
+  activeRole: string;
 }) {
   const { data: projects, isLoading } = useProjects();
+  const deleteProject = useDeleteProject();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const isOwner = activeRole === "owner";
+
+  const handleDelete = (id: bigint) => {
+    deleteProject.mutate(id, {
+      onSuccess: () => {
+        toast.success("Project removed from your list");
+      },
+      onError: () => {
+        toast.error("Failed to remove project");
+      },
+    });
+  };
 
   const filtered = projects?.filter((p) => {
     const matchesSearch = p.clientName
@@ -245,6 +317,8 @@ export function ProjectsPage({
               project={project}
               onSelect={onSelectProject}
               onEdit={onEditProject}
+              onDelete={handleDelete}
+              isOwner={isOwner}
             />
           ))}
         </div>

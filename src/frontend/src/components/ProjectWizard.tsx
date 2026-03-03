@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock,
   FileText,
   Info,
   Loader2,
@@ -112,6 +113,44 @@ const PRESET_APPLIANCES = [
   { name: "Agricultural Pump (3 HP)", wattage: 2238, surgeFactor: 3.5 },
 ];
 
+// ─── MOQ polling helper ────────────────────────────────────────────────────
+// ICP query calls can hit any replica, which may not have processed the latest
+// state mutation yet. We poll with increasing delays until items arrive.
+async function pollMOQ(
+  actor: { listMOQ: (id: bigint) => Promise<unknown[]> },
+  projectId: bigint,
+  maxAttempts = 6,
+): Promise<unknown[]> {
+  const delays = [300, 600, 1000, 1500, 2000, 3000];
+  for (let i = 0; i < maxAttempts; i++) {
+    const items = await actor.listMOQ(projectId);
+    if (items && items.length > 0) return items;
+    if (i < delays.length) {
+      await new Promise((r) => setTimeout(r, delays[i]));
+    }
+  }
+  return [];
+}
+
+// Serialize MOQ items for sessionStorage (BigInt → string)
+function serializeMOQForStorage(items: unknown[]): string {
+  return JSON.stringify(items, (_, v) =>
+    typeof v === "bigint" ? v.toString() : v,
+  );
+}
+
+// Deserialize MOQ items from sessionStorage (string → BigInt for id/projectId)
+function parseMOQFromStorage(
+  raw: string,
+): import("../hooks/useQueries").MOQItem[] {
+  const parsed = JSON.parse(raw);
+  return parsed.map((item: Record<string, unknown>) => ({
+    ...item,
+    id: BigInt(item.id as string),
+    projectId: BigInt(item.projectId as string),
+  }));
+}
+
 function generateROIData(totalCost: number, annualSavings: number, years = 25) {
   const data: { year: string; cumulative: number; annual: number }[] = [];
   let cumulative = -totalCost;
@@ -141,6 +180,12 @@ export function ProjectWizard({
   const [moqGenerated, setMoqGenerated] = useState(false);
   const [isRegenMOQ, setIsRegenMOQ] = useState(false);
   const [moqError, setMoqError] = useState<string | null>(null);
+  // Countdown retry state for backend-offline scenarios
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Whether we're currently polling (waiting for MOQ data after generation)
+  const [isFetchingMOQ, setIsFetchingMOQ] = useState(false);
 
   // Step 1
   const [clientName, setClientName] = useState("");
@@ -166,7 +211,43 @@ export function ProjectWizard({
   const [projectId, setProjectId] = useState<bigint | null>(
     editProjectId ?? null,
   );
-  const { data: moqItems, isLoading: moqLoading } = useMOQ(projectId);
+  // Ref-based MOQ cache: populated synchronously right after generation so Step 3 NEVER shows blank.
+  // Using a ref (not state) means the data is available immediately when Step 3 renders,
+  // regardless of React's async state batching.
+  const moqRef = useRef<import("../hooks/useQueries").MOQItem[]>([]);
+
+  // On first render, try to restore MOQ from sessionStorage if we're in edit mode
+  const [localMOQItems, setLocalMOQItems] = useState<
+    import("../hooks/useQueries").MOQItem[] | null
+  >(() => {
+    if (editProjectId !== undefined) {
+      try {
+        const raw = sessionStorage.getItem(`moq_${editProjectId.toString()}`);
+        if (raw) {
+          const parsed = parseMOQFromStorage(raw);
+          if (parsed.length > 0) return parsed;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return null;
+  });
+
+  const { data: moqItemsFromHook } = useMOQ(projectId);
+  // Priority: ref cache (set synchronously) > local state cache > sessionStorage (loaded on init) > hook data
+  // This ensures Step 3 always has data regardless of render timing or React batching
+  const moqItems =
+    moqRef.current.length > 0
+      ? moqRef.current
+      : localMOQItems && localMOQItems.length > 0
+        ? localMOQItems
+        : (moqItemsFromHook ?? null);
+  // Only show "fetching" skeleton if we're actively polling AND have no local cache
+  const moqLoading =
+    isFetchingMOQ &&
+    moqRef.current.length === 0 &&
+    (!localMOQItems || localMOQItems.length === 0);
   const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>(
     {},
   );
@@ -229,6 +310,9 @@ export function ProjectWizard({
         // Pre-populate MOQ cache
         const fetchedMOQ = await actor.listMOQ(editProjectId);
         queryClient.setQueryData(["moq", editProjectId.toString()], fetchedMOQ);
+        // Synchronously write to ref, then update state
+        moqRef.current = fetchedMOQ as import("../hooks/useQueries").MOQItem[];
+        setLocalMOQItems(fetchedMOQ as import("../hooks/useQueries").MOQItem[]);
         // Mark MOQ as generated so spec selectors appear immediately
         setMoqGenerated(true);
       } catch (err) {
@@ -240,8 +324,9 @@ export function ProjectWizard({
   // Auto-regenerate MOQ when product specs change (after initial MOQ generation)
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally watching only selectedProductIds to trigger regen on spec change
   useEffect(() => {
+    // Guard: skip on first render. isFirstRender is only set to false at the
+    // END of handleCreateOrUpdateProject so this fires only after generation.
     if (isFirstRender.current) {
-      isFirstRender.current = false;
       return;
     }
     if (!moqGenerated || !projectId || !actor) return;
@@ -264,8 +349,21 @@ export function ProjectWizard({
         } else {
           await actor.generateMOQ(projectId);
         }
-        const refreshed = await actor.listMOQ(projectId);
+        // Use polling to ensure we get fresh data after state mutation
+        const refreshed = await pollMOQ(actor, projectId);
         queryClient.setQueryData(["moq", projectId.toString()], refreshed);
+        moqRef.current = refreshed as import("../hooks/useQueries").MOQItem[];
+        const typed = refreshed as import("../hooks/useQueries").MOQItem[];
+        setLocalMOQItems(typed);
+        // Persist to sessionStorage so it survives step transitions
+        try {
+          sessionStorage.setItem(
+            `moq_${projectId.toString()}`,
+            serializeMOQForStorage(refreshed),
+          );
+        } catch {
+          // ignore storage errors
+        }
         toast.success("MOQ updated with new specifications");
       } catch {
         toast.error("Failed to update MOQ");
@@ -326,6 +424,19 @@ export function ProjectWizard({
 
   const systemSizeKW = Math.ceil(computedSystemSizeKW * 10) / 10;
 
+  // Cancel any pending auto-retry countdown
+  const cancelRetryCountdown = () => {
+    if (retryTimerRef.current) {
+      clearInterval(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    setRetryCountdown(null);
+  };
+
   const handleCreateOrUpdateProject = async () => {
     if (!actor) return;
     if (!clientName.trim()) {
@@ -338,8 +449,11 @@ export function ProjectWizard({
       );
       return;
     }
+    // Cancel any existing countdown when user manually retries
+    cancelRetryCountdown();
     setIsSubmitting(true);
     setMoqError(null);
+    setIsFetchingMOQ(false);
     try {
       let id: bigint;
 
@@ -406,14 +520,40 @@ export function ProjectWizard({
         await actor.generateMOQ(id);
       }
 
-      const fetchedMOQ = await actor.listMOQ(id);
+      // Show polling spinner while waiting for data to propagate across replicas
+      setIsSubmitting(false);
+      setIsFetchingMOQ(true);
+
+      // Poll with up to 6 retries and increasing delays to handle ICP replica lag
+      const fetchedMOQ = await pollMOQ(actor, id);
+
+      setIsFetchingMOQ(false);
+
+      // Persist to sessionStorage immediately so Step 3 render has it synchronously
+      if (fetchedMOQ.length > 0) {
+        try {
+          sessionStorage.setItem(
+            `moq_${id.toString()}`,
+            serializeMOQForStorage(fetchedMOQ),
+          );
+        } catch {
+          // ignore storage errors
+        }
+      }
+
       queryClient.setQueryData(["moq", id.toString()], fetchedMOQ);
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+
+      // Write to ref FIRST (synchronous) — this guarantees Step 3 has data
+      // regardless of when React schedules state updates
+      moqRef.current = fetchedMOQ as import("../hooks/useQueries").MOQItem[];
+      setLocalMOQItems(fetchedMOQ as import("../hooks/useQueries").MOQItem[]);
       setProjectId(id);
-      // Mark MOQ as generated — reveal spec selectors on same page (step 1)
+      // Mark MOQ as generated — reveal spec selectors on same page
       setMoqGenerated(true);
       setMoqError(null);
-      // Reset first-render guard so subsequent spec changes trigger auto-regen
+      // Set first-render guard to false AFTER successful generation so subsequent
+      // spec changes in the useEffect trigger auto-regen (not the first render)
       isFirstRender.current = false;
       toast.success(
         isEditMode
@@ -426,15 +566,35 @@ export function ProjectWizard({
       const isOffline =
         rawMsg.includes("IC0508") ||
         rawMsg.includes("is stopped") ||
+        rawMsg.includes("stopped") ||
         rawMsg.includes("rejected") ||
         rawMsg.includes("non_replicated_rejection");
       const userMsg = isOffline
         ? "The backend is offline. Please wait a moment and try again."
         : `Failed to ${isEditMode ? "update" : "create"} project: ${rawMsg}`;
       setMoqError(userMsg);
+      setIsFetchingMOQ(false);
       toast.error(userMsg, { duration: 6000 });
+
+      // If offline, start a 10-second countdown then auto-retry
+      if (isOffline) {
+        let count = 10;
+        setRetryCountdown(count);
+        retryTimerRef.current = setInterval(() => {
+          count -= 1;
+          setRetryCountdown(count);
+          if (count <= 0) {
+            cancelRetryCountdown();
+          }
+        }, 1000);
+        retryTimeoutRef.current = setTimeout(() => {
+          cancelRetryCountdown();
+          handleCreateOrUpdateProject();
+        }, 10000);
+      }
     } finally {
       setIsSubmitting(false);
+      setIsFetchingMOQ(false);
     }
   };
 
@@ -720,21 +880,44 @@ export function ProjectWizard({
                 <p className="text-sm text-destructive font-medium">
                   {moqError}
                 </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCreateOrUpdateProject}
-                  disabled={isSubmitting}
-                  className="mt-2 gap-1.5 h-7 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-3 w-3" />
+                {/* Countdown auto-retry indicator */}
+                {retryCountdown !== null && retryCountdown > 0 && (
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <Clock className="h-3 w-3 text-destructive/70" />
+                    <p className="text-xs text-destructive/80">
+                      Auto-retrying in {retryCountdown}s...
+                    </p>
+                  </div>
+                )}
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCreateOrUpdateProject}
+                    disabled={isSubmitting || isFetchingMOQ}
+                    className="gap-1.5 h-7 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
+                    data-ocid="moq.error_state"
+                  >
+                    {isSubmitting || isFetchingMOQ ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                    Retry Now
+                  </Button>
+                  {retryCountdown !== null && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={cancelRetryCountdown}
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Cancel Auto-Retry
+                    </Button>
                   )}
-                  Retry
-                </Button>
+                </div>
               </div>
             </div>
           )}
@@ -973,26 +1156,30 @@ export function ProjectWizard({
                     !canProceedStep1 ||
                     !canProceedLoadInput ||
                     systemSizeKW <= 0 ||
-                    isSubmitting
+                    isSubmitting ||
+                    isFetchingMOQ
                   }
                   className="w-full gap-2"
+                  data-ocid="moq.primary_button"
                 >
-                  {isSubmitting ? (
+                  {isSubmitting || isFetchingMOQ ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : moqGenerated ? (
                     <Sun className="h-4 w-4" />
                   ) : (
                     <Zap className="h-4 w-4" />
                   )}
-                  {isSubmitting
-                    ? isEditMode
-                      ? "Updating & Regenerating..."
-                      : "Generating MOQ..."
-                    : moqGenerated
+                  {isFetchingMOQ
+                    ? "Fetching MOQ data..."
+                    : isSubmitting
                       ? isEditMode
-                        ? "Update & Regenerate MOQ"
-                        : "Regenerate MOQ"
-                      : "Generate MOQ"}
+                        ? "Updating & Regenerating..."
+                        : "Generating MOQ..."
+                      : moqGenerated
+                        ? isEditMode
+                          ? "Update & Regenerate MOQ"
+                          : "Regenerate MOQ"
+                        : "Generate MOQ"}
                 </Button>
               </div>
             </CardContent>
@@ -1673,7 +1860,19 @@ export function ProjectWizard({
           </CardHeader>
           <CardContent>
             {moqLoading ? (
-              <div className="space-y-2">
+              <div className="space-y-3 py-4">
+                <div className="flex items-center gap-3 px-2 pb-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-navy shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-navy">
+                      Fetching MOQ data...
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Waiting for ICP replicas to sync. This usually takes 1–5
+                      seconds.
+                    </p>
+                  </div>
+                </div>
                 {["a", "b", "c", "d", "e", "f"].map((k) => (
                   <Skeleton key={k} className="h-10 w-full" />
                 ))}
@@ -2031,38 +2230,47 @@ export function ProjectWizard({
 
         {step < 3 ? (
           step === 1 ? (
-            // Step 2: "Next" only enabled after MOQ is generated
+            // Step 2: "Next" only enabled after MOQ is generated and not polling
             <TooltipProvider delayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span
                     className={
-                      !moqGenerated || isRegenMOQ ? "cursor-not-allowed" : ""
+                      !moqGenerated || isRegenMOQ || isFetchingMOQ
+                        ? "cursor-not-allowed"
+                        : ""
                     }
                   >
                     <Button
                       type="button"
                       onClick={() => setStep(2)}
-                      disabled={!moqGenerated || isRegenMOQ}
+                      disabled={!moqGenerated || isRegenMOQ || isFetchingMOQ}
                       className="gap-2"
+                      data-ocid="wizard.pagination_next"
                     >
-                      {isRegenMOQ ? (
+                      {isRegenMOQ || isFetchingMOQ ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <ChevronRight className="h-4 w-4" />
                       )}
-                      {isRegenMOQ ? "Updating MOQ..." : "Next →"}
+                      {isFetchingMOQ
+                        ? "Fetching MOQ..."
+                        : isRegenMOQ
+                          ? "Updating MOQ..."
+                          : "Next →"}
                     </Button>
                   </span>
                 </TooltipTrigger>
-                {(!moqGenerated || isRegenMOQ) && (
+                {(!moqGenerated || isRegenMOQ || isFetchingMOQ) && (
                   <TooltipContent
                     side="top"
                     className="text-xs max-w-[200px] text-center"
                   >
-                    {isRegenMOQ
-                      ? "Please wait while MOQ is being updated..."
-                      : "Generate MOQ above to continue"}
+                    {isFetchingMOQ
+                      ? "Fetching MOQ data from backend..."
+                      : isRegenMOQ
+                        ? "Please wait while MOQ is being updated..."
+                        : "Generate MOQ above to continue"}
                   </TooltipContent>
                 )}
               </Tooltip>
