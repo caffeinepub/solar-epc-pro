@@ -29,10 +29,10 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
+  Battery,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock,
   FileText,
   Info,
   Loader2,
@@ -58,10 +58,9 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-
-import { SEED_PRODUCTS_WITH_IDS } from "../data/seedProducts";
+import { MARKET_BRANDS, getBrandsByCategory } from "../data/marketBrands";
 import { useActor } from "../hooks/useActor";
-import { useMOQ, useProductMaster } from "../hooks/useQueries";
+import { useBrands, useMOQ, useProductMaster } from "../hooks/useQueries";
 import {
   QuotationStatus,
   Variant_applianceBased_consumptionBased,
@@ -113,44 +112,6 @@ const PRESET_APPLIANCES = [
   { name: "Agricultural Pump (3 HP)", wattage: 2238, surgeFactor: 3.5 },
 ];
 
-// ─── MOQ polling helper ────────────────────────────────────────────────────
-// ICP query calls can hit any replica, which may not have processed the latest
-// state mutation yet. We poll with increasing delays until items arrive.
-async function pollMOQ(
-  actor: { listMOQ: (id: bigint) => Promise<unknown[]> },
-  projectId: bigint,
-  maxAttempts = 6,
-): Promise<unknown[]> {
-  const delays = [300, 600, 1000, 1500, 2000, 3000];
-  for (let i = 0; i < maxAttempts; i++) {
-    const items = await actor.listMOQ(projectId);
-    if (items && items.length > 0) return items;
-    if (i < delays.length) {
-      await new Promise((r) => setTimeout(r, delays[i]));
-    }
-  }
-  return [];
-}
-
-// Serialize MOQ items for sessionStorage (BigInt → string)
-function serializeMOQForStorage(items: unknown[]): string {
-  return JSON.stringify(items, (_, v) =>
-    typeof v === "bigint" ? v.toString() : v,
-  );
-}
-
-// Deserialize MOQ items from sessionStorage (string → BigInt for id/projectId)
-function parseMOQFromStorage(
-  raw: string,
-): import("../hooks/useQueries").MOQItem[] {
-  const parsed = JSON.parse(raw);
-  return parsed.map((item: Record<string, unknown>) => ({
-    ...item,
-    id: BigInt(item.id as string),
-    projectId: BigInt(item.projectId as string),
-  }));
-}
-
 function generateROIData(totalCost: number, annualSavings: number, years = 25) {
   const data: { year: string; cumulative: number; annual: number }[] = [];
   let cumulative = -totalCost;
@@ -180,12 +141,6 @@ export function ProjectWizard({
   const [moqGenerated, setMoqGenerated] = useState(false);
   const [isRegenMOQ, setIsRegenMOQ] = useState(false);
   const [moqError, setMoqError] = useState<string | null>(null);
-  // Countdown retry state for backend-offline scenarios
-  const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
-  const retryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Whether we're currently polling (waiting for MOQ data after generation)
-  const [isFetchingMOQ, setIsFetchingMOQ] = useState(false);
 
   // Step 1
   const [clientName, setClientName] = useState("");
@@ -211,44 +166,14 @@ export function ProjectWizard({
   const [projectId, setProjectId] = useState<bigint | null>(
     editProjectId ?? null,
   );
-  // Ref-based MOQ cache: populated synchronously right after generation so Step 3 NEVER shows blank.
-  // Using a ref (not state) means the data is available immediately when Step 3 renders,
-  // regardless of React's async state batching.
-  const moqRef = useRef<import("../hooks/useQueries").MOQItem[]>([]);
-
-  // On first render, try to restore MOQ from sessionStorage if we're in edit mode
-  const [localMOQItems, setLocalMOQItems] = useState<
-    import("../hooks/useQueries").MOQItem[] | null
-  >(() => {
-    if (editProjectId !== undefined) {
-      try {
-        const raw = sessionStorage.getItem(`moq_${editProjectId.toString()}`);
-        if (raw) {
-          const parsed = parseMOQFromStorage(raw);
-          if (parsed.length > 0) return parsed;
-        }
-      } catch {
-        // ignore
-      }
-    }
-    return null;
-  });
-
-  const { data: moqItemsFromHook } = useMOQ(projectId);
-  // Priority: ref cache (set synchronously) > local state cache > sessionStorage (loaded on init) > hook data
-  // This ensures Step 3 always has data regardless of render timing or React batching
-  const moqItems =
-    moqRef.current.length > 0
-      ? moqRef.current
-      : localMOQItems && localMOQItems.length > 0
-        ? localMOQItems
-        : (moqItemsFromHook ?? null);
-  // Only show "fetching" skeleton if we're actively polling AND have no local cache
-  const moqLoading =
-    isFetchingMOQ &&
-    moqRef.current.length === 0 &&
-    (!localMOQItems || localMOQItems.length === 0);
+  const { data: moqItems, isLoading: moqLoading } = useMOQ(projectId);
   const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>(
+    {},
+  );
+
+  // Brand selection
+  const { data: brands } = useBrands();
+  const [selectedBrands, setSelectedBrands] = useState<Record<string, string>>(
     {},
   );
 
@@ -266,25 +191,6 @@ export function ProjectWizard({
     batteryId: null,
     cableId: null,
     structureId: null,
-  });
-
-  // Display labels for selections coming from static fallback (negative IDs)
-  const [selectedSpecLabels, setSelectedSpecLabels] = useState<
-    Record<string, string>
-  >({});
-  // Track fallback product IDs (negative) for Select display value
-  const [selectedFallbackIds, setSelectedFallbackIds] = useState<{
-    panel: string;
-    inverter: string;
-    battery: string;
-    cable: string;
-    structure: string;
-  }>({
-    panel: "",
-    inverter: "",
-    battery: "",
-    cable: "",
-    structure: "",
   });
 
   // Quotation fields
@@ -310,9 +216,6 @@ export function ProjectWizard({
         // Pre-populate MOQ cache
         const fetchedMOQ = await actor.listMOQ(editProjectId);
         queryClient.setQueryData(["moq", editProjectId.toString()], fetchedMOQ);
-        // Synchronously write to ref, then update state
-        moqRef.current = fetchedMOQ as import("../hooks/useQueries").MOQItem[];
-        setLocalMOQItems(fetchedMOQ as import("../hooks/useQueries").MOQItem[]);
         // Mark MOQ as generated so spec selectors appear immediately
         setMoqGenerated(true);
       } catch (err) {
@@ -324,9 +227,8 @@ export function ProjectWizard({
   // Auto-regenerate MOQ when product specs change (after initial MOQ generation)
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally watching only selectedProductIds to trigger regen on spec change
   useEffect(() => {
-    // Guard: skip on first render. isFirstRender is only set to false at the
-    // END of handleCreateOrUpdateProject so this fires only after generation.
     if (isFirstRender.current) {
+      isFirstRender.current = false;
       return;
     }
     if (!moqGenerated || !projectId || !actor) return;
@@ -349,21 +251,8 @@ export function ProjectWizard({
         } else {
           await actor.generateMOQ(projectId);
         }
-        // Use polling to ensure we get fresh data after state mutation
-        const refreshed = await pollMOQ(actor, projectId);
+        const refreshed = await actor.listMOQ(projectId);
         queryClient.setQueryData(["moq", projectId.toString()], refreshed);
-        moqRef.current = refreshed as import("../hooks/useQueries").MOQItem[];
-        const typed = refreshed as import("../hooks/useQueries").MOQItem[];
-        setLocalMOQItems(typed);
-        // Persist to sessionStorage so it survives step transitions
-        try {
-          sessionStorage.setItem(
-            `moq_${projectId.toString()}`,
-            serializeMOQForStorage(refreshed),
-          );
-        } catch {
-          // ignore storage errors
-        }
         toast.success("MOQ updated with new specifications");
       } catch {
         toast.error("Failed to update MOQ");
@@ -424,19 +313,6 @@ export function ProjectWizard({
 
   const systemSizeKW = Math.ceil(computedSystemSizeKW * 10) / 10;
 
-  // Cancel any pending auto-retry countdown
-  const cancelRetryCountdown = () => {
-    if (retryTimerRef.current) {
-      clearInterval(retryTimerRef.current);
-      retryTimerRef.current = null;
-    }
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
-    setRetryCountdown(null);
-  };
-
   const handleCreateOrUpdateProject = async () => {
     if (!actor) return;
     if (!clientName.trim()) {
@@ -449,11 +325,8 @@ export function ProjectWizard({
       );
       return;
     }
-    // Cancel any existing countdown when user manually retries
-    cancelRetryCountdown();
     setIsSubmitting(true);
     setMoqError(null);
-    setIsFetchingMOQ(false);
     try {
       let id: bigint;
 
@@ -520,40 +393,14 @@ export function ProjectWizard({
         await actor.generateMOQ(id);
       }
 
-      // Show polling spinner while waiting for data to propagate across replicas
-      setIsSubmitting(false);
-      setIsFetchingMOQ(true);
-
-      // Poll with up to 6 retries and increasing delays to handle ICP replica lag
-      const fetchedMOQ = await pollMOQ(actor, id);
-
-      setIsFetchingMOQ(false);
-
-      // Persist to sessionStorage immediately so Step 3 render has it synchronously
-      if (fetchedMOQ.length > 0) {
-        try {
-          sessionStorage.setItem(
-            `moq_${id.toString()}`,
-            serializeMOQForStorage(fetchedMOQ),
-          );
-        } catch {
-          // ignore storage errors
-        }
-      }
-
+      const fetchedMOQ = await actor.listMOQ(id);
       queryClient.setQueryData(["moq", id.toString()], fetchedMOQ);
       queryClient.invalidateQueries({ queryKey: ["projects"] });
-
-      // Write to ref FIRST (synchronous) — this guarantees Step 3 has data
-      // regardless of when React schedules state updates
-      moqRef.current = fetchedMOQ as import("../hooks/useQueries").MOQItem[];
-      setLocalMOQItems(fetchedMOQ as import("../hooks/useQueries").MOQItem[]);
       setProjectId(id);
-      // Mark MOQ as generated — reveal spec selectors on same page
+      // Mark MOQ as generated — reveal spec selectors on same page (step 1)
       setMoqGenerated(true);
       setMoqError(null);
-      // Set first-render guard to false AFTER successful generation so subsequent
-      // spec changes in the useEffect trigger auto-regen (not the first render)
+      // Reset first-render guard so subsequent spec changes trigger auto-regen
       isFirstRender.current = false;
       toast.success(
         isEditMode
@@ -566,35 +413,15 @@ export function ProjectWizard({
       const isOffline =
         rawMsg.includes("IC0508") ||
         rawMsg.includes("is stopped") ||
-        rawMsg.includes("stopped") ||
         rawMsg.includes("rejected") ||
         rawMsg.includes("non_replicated_rejection");
       const userMsg = isOffline
         ? "The backend is offline. Please wait a moment and try again."
         : `Failed to ${isEditMode ? "update" : "create"} project: ${rawMsg}`;
       setMoqError(userMsg);
-      setIsFetchingMOQ(false);
       toast.error(userMsg, { duration: 6000 });
-
-      // If offline, start a 10-second countdown then auto-retry
-      if (isOffline) {
-        let count = 10;
-        setRetryCountdown(count);
-        retryTimerRef.current = setInterval(() => {
-          count -= 1;
-          setRetryCountdown(count);
-          if (count <= 0) {
-            cancelRetryCountdown();
-          }
-        }, 1000);
-        retryTimeoutRef.current = setTimeout(() => {
-          cancelRetryCountdown();
-          handleCreateOrUpdateProject();
-        }, 10000);
-      }
     } finally {
       setIsSubmitting(false);
-      setIsFetchingMOQ(false);
     }
   };
 
@@ -657,33 +484,50 @@ export function ProjectWizard({
       {} as Record<string, typeof moqItems>,
     ) ?? {};
 
-  // Merge backend products with static fallback — always shows full catalog
-  const mergedProducts = (() => {
-    const backendProducts = allProducts ?? [];
-    const categories = [
-      "Solar Panel",
-      "Inverter",
-      "Battery",
-      "Cable",
-      "Structure",
-    ];
-    const result: (
-      | (typeof backendProducts)[0]
-      | (typeof SEED_PRODUCTS_WITH_IDS)[0]
-    )[] = [];
+  // Merge static market brands with any backend brands
+  const mergedBrandsByCategory = (() => {
+    const staticByCategory = getBrandsByCategory();
+    const backendByCategory =
+      brands?.reduce(
+        (acc, brand) => {
+          if (!acc[brand.category]) acc[brand.category] = [];
+          acc[brand.category].push(brand);
+          return acc;
+        },
+        {} as Record<string, typeof brands>,
+      ) ?? {};
 
-    for (const cat of categories) {
-      const backendForCat = backendProducts.filter(
-        (p) => p.category === cat && p.isActive,
-      );
-      if (backendForCat.length > 0) {
-        result.push(...backendForCat);
-      } else {
-        // Use static fallback with negative IDs
-        const fallback = SEED_PRODUCTS_WITH_IDS.filter(
-          (p) => p.category === cat && p.isActive,
+    const result: Record<
+      string,
+      Array<{ name: string; isActive: boolean }>
+    > = {};
+    for (const [cat, staticBrands] of Object.entries(staticByCategory)) {
+      result[cat] = staticBrands.map((sb) => {
+        const backendMatch = backendByCategory[cat]?.find(
+          (bb) => bb.name.toLowerCase() === sb.name.toLowerCase(),
         );
-        result.push(...fallback);
+        return {
+          name: sb.name,
+          isActive: backendMatch ? backendMatch.isActive : true,
+        };
+      });
+      if (backendByCategory[cat]) {
+        for (const bb of backendByCategory[cat] ?? []) {
+          const alreadyIncluded = result[cat].some(
+            (r) => r.name.toLowerCase() === bb.name.toLowerCase(),
+          );
+          if (!alreadyIncluded) {
+            result[cat].push({ name: bb.name, isActive: bb.isActive });
+          }
+        }
+      }
+    }
+    for (const [cat, bBrands] of Object.entries(backendByCategory)) {
+      if (!result[cat]) {
+        result[cat] = (bBrands ?? []).map((bb) => ({
+          name: bb.name,
+          isActive: bb.isActive,
+        }));
       }
     }
     return result;
@@ -733,11 +577,11 @@ export function ProjectWizard({
       </div>
 
       {/* Step indicator */}
-      <div className="flex gap-1 items-center">
+      <div className="flex gap-1 items-center overflow-x-auto flex-nowrap pb-1">
         {STEPS.map((s, i) => (
-          <div key={s.label} className="flex items-center gap-1 flex-1">
+          <div key={s.label} className="flex items-center gap-1 flex-shrink-0">
             <div
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
                 i === step
                   ? "bg-navy text-white"
                   : i < step
@@ -754,7 +598,7 @@ export function ProjectWizard({
             </div>
             {i < STEPS.length - 1 && (
               <div
-                className={`h-0.5 flex-1 rounded-full ${i < step ? "bg-navy/30" : "bg-border"}`}
+                className={`h-0.5 w-4 sm:flex-1 sm:w-auto rounded-full flex-shrink-0 ${i < step ? "bg-navy/30" : "bg-border"}`}
               />
             )}
           </div>
@@ -880,44 +724,21 @@ export function ProjectWizard({
                 <p className="text-sm text-destructive font-medium">
                   {moqError}
                 </p>
-                {/* Countdown auto-retry indicator */}
-                {retryCountdown !== null && retryCountdown > 0 && (
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <Clock className="h-3 w-3 text-destructive/70" />
-                    <p className="text-xs text-destructive/80">
-                      Auto-retrying in {retryCountdown}s...
-                    </p>
-                  </div>
-                )}
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCreateOrUpdateProject}
-                    disabled={isSubmitting || isFetchingMOQ}
-                    className="gap-1.5 h-7 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
-                    data-ocid="moq.error_state"
-                  >
-                    {isSubmitting || isFetchingMOQ ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3 w-3" />
-                    )}
-                    Retry Now
-                  </Button>
-                  {retryCountdown !== null && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={cancelRetryCountdown}
-                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Cancel Auto-Retry
-                    </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateOrUpdateProject}
+                  disabled={isSubmitting}
+                  className="mt-2 gap-1.5 h-7 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3" />
                   )}
-                </div>
+                  Retry
+                </Button>
               </div>
             </div>
           )}
@@ -1156,61 +977,55 @@ export function ProjectWizard({
                     !canProceedStep1 ||
                     !canProceedLoadInput ||
                     systemSizeKW <= 0 ||
-                    isSubmitting ||
-                    isFetchingMOQ
+                    isSubmitting
                   }
                   className="w-full gap-2"
-                  data-ocid="moq.primary_button"
                 >
-                  {isSubmitting || isFetchingMOQ ? (
+                  {isSubmitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : moqGenerated ? (
                     <Sun className="h-4 w-4" />
                   ) : (
                     <Zap className="h-4 w-4" />
                   )}
-                  {isFetchingMOQ
-                    ? "Fetching MOQ data..."
-                    : isSubmitting
+                  {isSubmitting
+                    ? isEditMode
+                      ? "Updating & Regenerating..."
+                      : "Generating MOQ..."
+                    : moqGenerated
                       ? isEditMode
-                        ? "Updating & Regenerating..."
-                        : "Generating MOQ..."
-                      : moqGenerated
-                        ? isEditMode
-                          ? "Update & Regenerate MOQ"
-                          : "Regenerate MOQ"
-                        : "Generate MOQ"}
+                        ? "Update & Regenerate MOQ"
+                        : "Regenerate MOQ"
+                      : "Generate MOQ"}
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Phase B — Brands & Product Specifications (revealed after MOQ generated) */}
+          {/* Phase B — Material Specifications (revealed after MOQ generated) */}
           {moqGenerated && (
             <Card className="border-navy/20">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Package className="h-4 w-4 text-navy" />
-                  Brands &amp; Product Specifications
+                  Material Specifications
                   {isRegenMOQ && (
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-navy ml-1" />
                   )}
                   <span className="ml-auto text-xs font-normal text-muted-foreground">
-                    Select specs to auto-update MOQ pricing
+                    Selecting a product auto-updates MOQ pricing
                   </span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Solar Panel */}
                 {(() => {
-                  const panels = mergedProducts.filter(
-                    (p) => p.category === "Solar Panel",
+                  const panels = (allProducts ?? []).filter(
+                    (p) => p.category === "Solar Panel" && p.isActive,
                   );
-                  const selId = selectedProductIds.panelId;
-                  const displayVal =
-                    selId?.toString() ?? selectedFallbackIds.panel;
+                  if (panels.length === 0) return null;
                   const sel = panels.find(
-                    (p) => p.id === selId || p.id.toString() === displayVal,
+                    (p) => p.id === selectedProductIds.panelId,
                   );
                   return (
                     <div>
@@ -1218,44 +1033,16 @@ export function ProjectWizard({
                         Solar Panel
                       </Label>
                       <Select
-                        value={displayVal}
-                        onValueChange={(v) => {
-                          const newId = v ? BigInt(v) : null;
-                          const isFb = newId !== null && newId < BigInt(0);
-                          if (isFb && newId !== null) {
-                            const p = panels.find((x) => x.id === newId);
-                            setSelectedSpecLabels((prev) => ({
-                              ...prev,
-                              panel: p
-                                ? `${p.brand} | ${p.productType} | ${p.capacity}`
-                                : "",
-                            }));
-                            setSelectedFallbackIds((prev) => ({
-                              ...prev,
-                              panel: v,
-                            }));
-                            setSelectedProductIds((prev) => ({
-                              ...prev,
-                              panelId: null,
-                            }));
-                          } else {
-                            setSelectedSpecLabels((prev) => ({
-                              ...prev,
-                              panel: "",
-                            }));
-                            setSelectedFallbackIds((prev) => ({
-                              ...prev,
-                              panel: "",
-                            }));
-                            setSelectedProductIds((prev) => ({
-                              ...prev,
-                              panelId: newId,
-                            }));
-                          }
-                        }}
+                        value={selectedProductIds.panelId?.toString() ?? ""}
+                        onValueChange={(v) =>
+                          setSelectedProductIds((prev) => ({
+                            ...prev,
+                            panelId: v ? BigInt(v) : null,
+                          }))
+                        }
                       >
                         <SelectTrigger className="mt-1.5">
-                          <SelectValue placeholder="Select panel brand, type & size..." />
+                          <SelectValue placeholder="Select panel model..." />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">
@@ -1278,30 +1065,20 @@ export function ProjectWizard({
                           "border border-solar/25",
                           "text-navy",
                           `${sel.brand} ${sel.productType} ${sel.capacity} | Eff: ${sel.efficiency}% | Warranty: ${Number(sel.warrantyYears)}yr`,
-                          `₹${sel.pricePerUnit.toLocaleString()}/${sel.unit}`,
+                          `₹${sel.pricePerUnit.toLocaleString()}`,
                         )}
-                      {!sel && selectedSpecLabels.panel && (
-                        <div className="mt-1.5 p-2 rounded-md bg-solar/10 border border-solar/25 text-xs text-navy flex justify-between items-center">
-                          <span>{selectedSpecLabels.panel}</span>
-                          <Badge className="bg-amber-100 text-amber-700 border border-amber-300 text-xs ml-2">
-                            Catalog
-                          </Badge>
-                        </div>
-                      )}
                     </div>
                   );
                 })()}
 
                 {/* Inverter */}
                 {(() => {
-                  const inverters = mergedProducts.filter(
-                    (p) => p.category === "Inverter",
+                  const inverters = (allProducts ?? []).filter(
+                    (p) => p.category === "Inverter" && p.isActive,
                   );
-                  const selId = selectedProductIds.inverterId;
-                  const displayVal =
-                    selId?.toString() ?? selectedFallbackIds.inverter;
+                  if (inverters.length === 0) return null;
                   const sel = inverters.find(
-                    (p) => p.id === selId || p.id.toString() === displayVal,
+                    (p) => p.id === selectedProductIds.inverterId,
                   );
                   return (
                     <div>
@@ -1309,44 +1086,16 @@ export function ProjectWizard({
                         Inverter
                       </Label>
                       <Select
-                        value={displayVal}
-                        onValueChange={(v) => {
-                          const newId = v ? BigInt(v) : null;
-                          const isFb = newId !== null && newId < BigInt(0);
-                          if (isFb && newId !== null) {
-                            const p = inverters.find((x) => x.id === newId);
-                            setSelectedSpecLabels((prev) => ({
-                              ...prev,
-                              inverter: p
-                                ? `${p.brand} | ${p.productType} | ${p.capacity}`
-                                : "",
-                            }));
-                            setSelectedFallbackIds((prev) => ({
-                              ...prev,
-                              inverter: v,
-                            }));
-                            setSelectedProductIds((prev) => ({
-                              ...prev,
-                              inverterId: null,
-                            }));
-                          } else {
-                            setSelectedSpecLabels((prev) => ({
-                              ...prev,
-                              inverter: "",
-                            }));
-                            setSelectedFallbackIds((prev) => ({
-                              ...prev,
-                              inverter: "",
-                            }));
-                            setSelectedProductIds((prev) => ({
-                              ...prev,
-                              inverterId: newId,
-                            }));
-                          }
-                        }}
+                        value={selectedProductIds.inverterId?.toString() ?? ""}
+                        onValueChange={(v) =>
+                          setSelectedProductIds((prev) => ({
+                            ...prev,
+                            inverterId: v ? BigInt(v) : null,
+                          }))
+                        }
                       >
                         <SelectTrigger className="mt-1.5">
-                          <SelectValue placeholder="Select inverter brand, type & capacity..." />
+                          <SelectValue placeholder="Select inverter model..." />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">
@@ -1371,125 +1120,73 @@ export function ProjectWizard({
                           `${sel.brand} ${sel.productType} ${sel.capacity} | ${sel.voltage} | Warranty: ${Number(sel.warrantyYears)}yr`,
                           `₹${sel.pricePerUnit.toLocaleString()}`,
                         )}
-                      {!sel && selectedSpecLabels.inverter && (
-                        <div className="mt-1.5 p-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-navy flex justify-between items-center">
-                          <span>{selectedSpecLabels.inverter}</span>
-                          <Badge className="bg-blue-100 text-blue-700 border border-blue-300 text-xs ml-2">
-                            Catalog
-                          </Badge>
-                        </div>
-                      )}
                     </div>
                   );
                 })()}
 
-                {/* Battery — always shown (relevant for all types, required for off-grid/hybrid) */}
-                {(() => {
-                  const batteries = mergedProducts.filter(
-                    (p) => p.category === "Battery",
-                  );
-                  const selId = selectedProductIds.batteryId;
-                  const displayVal =
-                    selId?.toString() ?? selectedFallbackIds.battery;
-                  const sel = batteries.find(
-                    (p) => p.id === selId || p.id.toString() === displayVal,
-                  );
-                  return (
-                    <div>
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-navy">
-                        Battery
-                        {systemType ===
-                          Variant_hybrid_offGrid_onGrid.onGrid && (
-                          <span className="ml-2 text-xs font-normal text-muted-foreground normal-case">
-                            (optional for on-grid)
-                          </span>
-                        )}
-                      </Label>
-                      <Select
-                        value={displayVal}
-                        onValueChange={(v) => {
-                          const newId = v ? BigInt(v) : null;
-                          const isFb = newId !== null && newId < BigInt(0);
-                          if (isFb && newId !== null) {
-                            const p = batteries.find((x) => x.id === newId);
-                            setSelectedSpecLabels((prev) => ({
-                              ...prev,
-                              battery: p
-                                ? `${p.brand} | ${p.productType} | ${p.capacity}`
-                                : "",
-                            }));
-                            setSelectedFallbackIds((prev) => ({
-                              ...prev,
-                              battery: v,
-                            }));
+                {/* Battery — only for off-grid/hybrid */}
+                {(systemType === Variant_hybrid_offGrid_onGrid.offGrid ||
+                  systemType === Variant_hybrid_offGrid_onGrid.hybrid) &&
+                  (() => {
+                    const batteries = (allProducts ?? []).filter(
+                      (p) => p.category === "Battery" && p.isActive,
+                    );
+                    if (batteries.length === 0) return null;
+                    const sel = batteries.find(
+                      (p) => p.id === selectedProductIds.batteryId,
+                    );
+                    return (
+                      <div>
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-navy">
+                          Battery
+                        </Label>
+                        <Select
+                          value={selectedProductIds.batteryId?.toString() ?? ""}
+                          onValueChange={(v) =>
                             setSelectedProductIds((prev) => ({
                               ...prev,
-                              batteryId: null,
-                            }));
-                          } else {
-                            setSelectedSpecLabels((prev) => ({
-                              ...prev,
-                              battery: "",
-                            }));
-                            setSelectedFallbackIds((prev) => ({
-                              ...prev,
-                              battery: "",
-                            }));
-                            setSelectedProductIds((prev) => ({
-                              ...prev,
-                              batteryId: newId,
-                            }));
+                              batteryId: v ? BigInt(v) : null,
+                            }))
                           }
-                        }}
-                      >
-                        <SelectTrigger className="mt-1.5">
-                          <SelectValue placeholder="Select battery brand, type & capacity..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">
-                            — None (use default pricing) —
-                          </SelectItem>
-                          {batteries.map((p) => (
-                            <SelectItem
-                              key={p.id.toString()}
-                              value={p.id.toString()}
-                            >
-                              {p.brand} | {p.productType} | {p.capacity} |{" "}
-                              {p.voltage} — ₹{p.pricePerUnit.toLocaleString()}
+                        >
+                          <SelectTrigger className="mt-1.5">
+                            <SelectValue placeholder="Select battery model..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">
+                              — None (use default pricing) —
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {sel &&
-                        renderSelectedSpec(
-                          "bg-green-50",
-                          "border border-green-200",
-                          "text-navy",
-                          `${sel.brand} ${sel.productType} ${sel.capacity} | ${sel.voltage} | Warranty: ${Number(sel.warrantyYears)}yr`,
-                          `₹${sel.pricePerUnit.toLocaleString()}`,
-                        )}
-                      {!sel && selectedSpecLabels.battery && (
-                        <div className="mt-1.5 p-2 rounded-md bg-green-50 border border-green-200 text-xs text-navy flex justify-between items-center">
-                          <span>{selectedSpecLabels.battery}</span>
-                          <Badge className="bg-green-100 text-green-700 border border-green-300 text-xs ml-2">
-                            Catalog
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                            {batteries.map((p) => (
+                              <SelectItem
+                                key={p.id.toString()}
+                                value={p.id.toString()}
+                              >
+                                {p.brand} | {p.productType} | {p.capacity} |{" "}
+                                {p.voltage} — ₹{p.pricePerUnit.toLocaleString()}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {sel &&
+                          renderSelectedSpec(
+                            "bg-green-50",
+                            "border border-green-200",
+                            "text-navy",
+                            `${sel.brand} ${sel.productType} ${sel.capacity} | ${sel.voltage} | Warranty: ${Number(sel.warrantyYears)}yr`,
+                            `₹${sel.pricePerUnit.toLocaleString()}`,
+                          )}
+                      </div>
+                    );
+                  })()}
 
                 {/* Cable */}
                 {(() => {
-                  const cables = mergedProducts.filter(
-                    (p) => p.category === "Cable",
+                  const cables = (allProducts ?? []).filter(
+                    (p) => p.category === "Cable" && p.isActive,
                   );
-                  const selId = selectedProductIds.cableId;
-                  const displayVal =
-                    selId?.toString() ?? selectedFallbackIds.cable;
+                  if (cables.length === 0) return null;
                   const sel = cables.find(
-                    (p) => p.id === selId || p.id.toString() === displayVal,
+                    (p) => p.id === selectedProductIds.cableId,
                   );
                   return (
                     <div>
@@ -1497,44 +1194,16 @@ export function ProjectWizard({
                         Cable Type
                       </Label>
                       <Select
-                        value={displayVal}
-                        onValueChange={(v) => {
-                          const newId = v ? BigInt(v) : null;
-                          const isFb = newId !== null && newId < BigInt(0);
-                          if (isFb && newId !== null) {
-                            const p = cables.find((x) => x.id === newId);
-                            setSelectedSpecLabels((prev) => ({
-                              ...prev,
-                              cable: p
-                                ? `${p.brand} | ${p.productType} | ${p.capacity}`
-                                : "",
-                            }));
-                            setSelectedFallbackIds((prev) => ({
-                              ...prev,
-                              cable: v,
-                            }));
-                            setSelectedProductIds((prev) => ({
-                              ...prev,
-                              cableId: null,
-                            }));
-                          } else {
-                            setSelectedSpecLabels((prev) => ({
-                              ...prev,
-                              cable: "",
-                            }));
-                            setSelectedFallbackIds((prev) => ({
-                              ...prev,
-                              cable: "",
-                            }));
-                            setSelectedProductIds((prev) => ({
-                              ...prev,
-                              cableId: newId,
-                            }));
-                          }
-                        }}
+                        value={selectedProductIds.cableId?.toString() ?? ""}
+                        onValueChange={(v) =>
+                          setSelectedProductIds((prev) => ({
+                            ...prev,
+                            cableId: v ? BigInt(v) : null,
+                          }))
+                        }
                       >
                         <SelectTrigger className="mt-1.5">
-                          <SelectValue placeholder="Select cable brand & size..." />
+                          <SelectValue placeholder="Select cable type..." />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">
@@ -1560,28 +1229,18 @@ export function ProjectWizard({
                           `${sel.brand} ${sel.productType} ${sel.capacity} | ${sel.voltage}`,
                           `₹${sel.pricePerUnit.toLocaleString()}/${sel.unit}`,
                         )}
-                      {!sel && selectedSpecLabels.cable && (
-                        <div className="mt-1.5 p-2 rounded-md bg-orange-50 border border-orange-200 text-xs text-navy flex justify-between items-center">
-                          <span>{selectedSpecLabels.cable}</span>
-                          <Badge className="bg-orange-100 text-orange-700 border border-orange-300 text-xs ml-2">
-                            Catalog
-                          </Badge>
-                        </div>
-                      )}
                     </div>
                   );
                 })()}
 
                 {/* Structure */}
                 {(() => {
-                  const structures = mergedProducts.filter(
-                    (p) => p.category === "Structure",
+                  const structures = (allProducts ?? []).filter(
+                    (p) => p.category === "Structure" && p.isActive,
                   );
-                  const selId = selectedProductIds.structureId;
-                  const displayVal =
-                    selId?.toString() ?? selectedFallbackIds.structure;
+                  if (structures.length === 0) return null;
                   const sel = structures.find(
-                    (p) => p.id === selId || p.id.toString() === displayVal,
+                    (p) => p.id === selectedProductIds.structureId,
                   );
                   return (
                     <div>
@@ -1589,44 +1248,16 @@ export function ProjectWizard({
                         Mounting Structure
                       </Label>
                       <Select
-                        value={displayVal}
-                        onValueChange={(v) => {
-                          const newId = v ? BigInt(v) : null;
-                          const isFb = newId !== null && newId < BigInt(0);
-                          if (isFb && newId !== null) {
-                            const p = structures.find((x) => x.id === newId);
-                            setSelectedSpecLabels((prev) => ({
-                              ...prev,
-                              structure: p
-                                ? `${p.brand} | ${p.productType} | ${p.capacity}`
-                                : "",
-                            }));
-                            setSelectedFallbackIds((prev) => ({
-                              ...prev,
-                              structure: v,
-                            }));
-                            setSelectedProductIds((prev) => ({
-                              ...prev,
-                              structureId: null,
-                            }));
-                          } else {
-                            setSelectedSpecLabels((prev) => ({
-                              ...prev,
-                              structure: "",
-                            }));
-                            setSelectedFallbackIds((prev) => ({
-                              ...prev,
-                              structure: "",
-                            }));
-                            setSelectedProductIds((prev) => ({
-                              ...prev,
-                              structureId: newId,
-                            }));
-                          }
-                        }}
+                        value={selectedProductIds.structureId?.toString() ?? ""}
+                        onValueChange={(v) =>
+                          setSelectedProductIds((prev) => ({
+                            ...prev,
+                            structureId: v ? BigInt(v) : null,
+                          }))
+                        }
                       >
                         <SelectTrigger className="mt-1.5">
-                          <SelectValue placeholder="Select structure brand & type..." />
+                          <SelectValue placeholder="Select structure type..." />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">
@@ -1651,149 +1282,104 @@ export function ProjectWizard({
                           `${sel.brand} ${sel.productType} | ${sel.capacity} | Warranty: ${Number(sel.warrantyYears)}yr`,
                           `₹${sel.pricePerUnit.toLocaleString()}/${sel.unit}`,
                         )}
-                      {!sel && selectedSpecLabels.structure && (
-                        <div className="mt-1.5 p-2 rounded-md bg-purple-50 border border-purple-200 text-xs text-navy flex justify-between items-center">
-                          <span>{selectedSpecLabels.structure}</span>
-                          <Badge className="bg-purple-100 text-purple-700 border border-purple-300 text-xs ml-2">
-                            Catalog
-                          </Badge>
-                        </div>
-                      )}
                     </div>
                   );
                 })()}
 
-                {/* Selected specs summary badges */}
+                {/* Selected product summary badges */}
                 {(selectedProductIds.panelId ||
                   selectedProductIds.inverterId ||
                   selectedProductIds.batteryId ||
                   selectedProductIds.cableId ||
-                  selectedProductIds.structureId ||
-                  selectedSpecLabels.panel ||
-                  selectedSpecLabels.inverter ||
-                  selectedSpecLabels.battery ||
-                  selectedSpecLabels.cable ||
-                  selectedSpecLabels.structure) && (
+                  selectedProductIds.structureId) && (
                   <div className="p-3 rounded-lg bg-navy/5 border border-navy/15">
                     <p className="text-xs font-semibold text-navy mb-2">
                       Selected Specifications
                     </p>
                     <div className="flex flex-wrap gap-1.5">
-                      {/* Backend product badges */}
                       {selectedProductIds.panelId &&
-                        mergedProducts.find(
+                        allProducts?.find(
                           (p) => p.id === selectedProductIds.panelId,
                         ) && (
                           <Badge className="bg-amber-100 text-amber-800 border border-amber-300 text-xs">
                             Panel:{" "}
                             {
-                              mergedProducts.find(
+                              allProducts.find(
                                 (p) => p.id === selectedProductIds.panelId,
                               )?.brand
                             }{" "}
                             {
-                              mergedProducts.find(
+                              allProducts.find(
                                 (p) => p.id === selectedProductIds.panelId,
                               )?.capacity
                             }
                           </Badge>
                         )}
                       {selectedProductIds.inverterId &&
-                        mergedProducts.find(
+                        allProducts?.find(
                           (p) => p.id === selectedProductIds.inverterId,
                         ) && (
                           <Badge className="bg-blue-100 text-blue-800 border border-blue-300 text-xs">
                             Inverter:{" "}
                             {
-                              mergedProducts.find(
+                              allProducts.find(
                                 (p) => p.id === selectedProductIds.inverterId,
                               )?.brand
                             }{" "}
                             {
-                              mergedProducts.find(
+                              allProducts.find(
                                 (p) => p.id === selectedProductIds.inverterId,
                               )?.capacity
                             }
                           </Badge>
                         )}
                       {selectedProductIds.batteryId &&
-                        mergedProducts.find(
+                        allProducts?.find(
                           (p) => p.id === selectedProductIds.batteryId,
                         ) && (
                           <Badge className="bg-green-100 text-green-800 border border-green-300 text-xs">
                             Battery:{" "}
                             {
-                              mergedProducts.find(
+                              allProducts.find(
                                 (p) => p.id === selectedProductIds.batteryId,
                               )?.brand
                             }{" "}
                             {
-                              mergedProducts.find(
+                              allProducts.find(
                                 (p) => p.id === selectedProductIds.batteryId,
                               )?.capacity
                             }
                           </Badge>
                         )}
                       {selectedProductIds.cableId &&
-                        mergedProducts.find(
+                        allProducts?.find(
                           (p) => p.id === selectedProductIds.cableId,
                         ) && (
                           <Badge className="bg-orange-100 text-orange-800 border border-orange-300 text-xs">
                             Cable:{" "}
                             {
-                              mergedProducts.find(
+                              allProducts.find(
                                 (p) => p.id === selectedProductIds.cableId,
                               )?.brand
                             }{" "}
                             {
-                              mergedProducts.find(
+                              allProducts.find(
                                 (p) => p.id === selectedProductIds.cableId,
                               )?.capacity
                             }
                           </Badge>
                         )}
                       {selectedProductIds.structureId &&
-                        mergedProducts.find(
+                        allProducts?.find(
                           (p) => p.id === selectedProductIds.structureId,
                         ) && (
                           <Badge className="bg-purple-100 text-purple-800 border border-purple-300 text-xs">
                             Structure:{" "}
                             {
-                              mergedProducts.find(
+                              allProducts.find(
                                 (p) => p.id === selectedProductIds.structureId,
                               )?.productType
                             }
-                          </Badge>
-                        )}
-                      {/* Catalog fallback labels */}
-                      {!selectedProductIds.panelId &&
-                        selectedSpecLabels.panel && (
-                          <Badge className="bg-amber-100 text-amber-800 border border-amber-300 text-xs">
-                            Panel: {selectedSpecLabels.panel}
-                          </Badge>
-                        )}
-                      {!selectedProductIds.inverterId &&
-                        selectedSpecLabels.inverter && (
-                          <Badge className="bg-blue-100 text-blue-800 border border-blue-300 text-xs">
-                            Inverter: {selectedSpecLabels.inverter}
-                          </Badge>
-                        )}
-                      {!selectedProductIds.batteryId &&
-                        selectedSpecLabels.battery && (
-                          <Badge className="bg-green-100 text-green-800 border border-green-300 text-xs">
-                            Battery: {selectedSpecLabels.battery}
-                          </Badge>
-                        )}
-                      {!selectedProductIds.cableId &&
-                        selectedSpecLabels.cable && (
-                          <Badge className="bg-orange-100 text-orange-800 border border-orange-300 text-xs">
-                            Cable: {selectedSpecLabels.cable}
-                          </Badge>
-                        )}
-                      {!selectedProductIds.structureId &&
-                        selectedSpecLabels.structure && (
-                          <Badge className="bg-purple-100 text-purple-800 border border-purple-300 text-xs">
-                            Structure: {selectedSpecLabels.structure}
                           </Badge>
                         )}
                     </div>
@@ -1844,6 +1430,72 @@ export function ProjectWizard({
               </CardContent>
             </Card>
           )}
+
+          {/* Brand Selection reference grid */}
+          {moqGenerated && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Battery className="h-4 w-4 text-navy" />
+                  Brand Reference
+                  <span className="ml-auto text-xs font-normal text-muted-foreground">
+                    {MARKET_BRANDS.length} brands available
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {Object.entries(mergedBrandsByCategory).map(
+                  ([category, categoryBrands]) => (
+                    <div key={category}>
+                      <Label className="text-xs font-semibold uppercase tracking-wider text-navy">
+                        {category}
+                      </Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {categoryBrands
+                          .filter((b) => b.isActive)
+                          .map((brand) => (
+                            <button
+                              type="button"
+                              key={brand.name}
+                              onClick={() =>
+                                setSelectedBrands((prev) => ({
+                                  ...prev,
+                                  [category]: brand.name,
+                                }))
+                              }
+                              className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-all ${
+                                selectedBrands[category] === brand.name
+                                  ? "bg-navy text-white border-navy"
+                                  : "bg-secondary text-secondary-foreground border-border hover:border-solar/60 hover:bg-solar/10"
+                              }`}
+                            >
+                              {brand.name}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  ),
+                )}
+                {Object.keys(selectedBrands).length > 0 && (
+                  <div className="p-3 rounded-lg bg-secondary/50 border border-border">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+                      Selected Brands
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(selectedBrands).map(([cat, name]) => (
+                        <Badge
+                          key={cat}
+                          className="bg-solar/25 text-solar-dark text-xs border border-solar/40"
+                        >
+                          {cat}: {name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
@@ -1860,19 +1512,7 @@ export function ProjectWizard({
           </CardHeader>
           <CardContent>
             {moqLoading ? (
-              <div className="space-y-3 py-4">
-                <div className="flex items-center gap-3 px-2 pb-2">
-                  <Loader2 className="h-5 w-5 animate-spin text-navy shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-navy">
-                      Fetching MOQ data...
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Waiting for ICP replicas to sync. This usually takes 1–5
-                      seconds.
-                    </p>
-                  </div>
-                </div>
+              <div className="space-y-2">
                 {["a", "b", "c", "d", "e", "f"].map((k) => (
                   <Skeleton key={k} className="h-10 w-full" />
                 ))}
@@ -1904,85 +1544,88 @@ export function ProjectWizard({
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-navy mb-2">
                       {category}
                     </h4>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Item</TableHead>
-                          <TableHead className="text-xs text-right">
-                            Qty
-                          </TableHead>
-                          <TableHead className="text-xs">Unit</TableHead>
-                          <TableHead className="text-xs text-right">
-                            Unit Price
-                          </TableHead>
-                          <TableHead className="text-xs text-right">
-                            Total
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {items.map((item) => {
-                          const effectivePrice =
-                            priceOverrides[item.id.toString()] ??
-                            item.unitPrice;
-                          const effectiveTotal = item.quantity * effectivePrice;
-                          return (
-                            <TableRow key={item.id.toString()}>
-                              <TableCell className="text-sm">
-                                {item.itemName}
-                              </TableCell>
-                              <TableCell className="text-sm text-right">
-                                {item.quantity}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {item.unit}
-                              </TableCell>
-                              <TableCell className="text-sm text-right">
-                                <Input
-                                  type="number"
-                                  className="w-24 h-7 text-xs text-right"
-                                  value={
-                                    priceOverrides[item.id.toString()] ??
-                                    item.unitPrice
-                                  }
-                                  onChange={(e) => {
-                                    const val =
-                                      Number.parseFloat(e.target.value) || 0;
-                                    setPriceOverrides((prev) => ({
-                                      ...prev,
-                                      [item.id.toString()]: val,
-                                    }));
-                                  }}
-                                  onBlur={async (e) => {
-                                    const val =
-                                      Number.parseFloat(e.target.value) || 0;
-                                    try {
-                                      await actor?.updateMOQItem(
-                                        item.id,
-                                        item.itemName,
-                                        item.category,
-                                        item.quantity,
-                                        item.unit,
-                                        item.brand,
-                                        val,
-                                      );
-                                      queryClient.invalidateQueries({
-                                        queryKey: ["moq"],
-                                      });
-                                    } catch {
-                                      toast.error("Failed to update price");
+                    <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+                      <Table className="min-w-[500px] w-full">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Item</TableHead>
+                            <TableHead className="text-xs text-right">
+                              Qty
+                            </TableHead>
+                            <TableHead className="text-xs">Unit</TableHead>
+                            <TableHead className="text-xs text-right">
+                              Unit Price
+                            </TableHead>
+                            <TableHead className="text-xs text-right">
+                              Total
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {items.map((item) => {
+                            const effectivePrice =
+                              priceOverrides[item.id.toString()] ??
+                              item.unitPrice;
+                            const effectiveTotal =
+                              item.quantity * effectivePrice;
+                            return (
+                              <TableRow key={item.id.toString()}>
+                                <TableCell className="text-sm">
+                                  {item.itemName}
+                                </TableCell>
+                                <TableCell className="text-sm text-right">
+                                  {item.quantity}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {item.unit}
+                                </TableCell>
+                                <TableCell className="text-sm text-right">
+                                  <Input
+                                    type="number"
+                                    className="w-24 h-7 text-xs text-right"
+                                    value={
+                                      priceOverrides[item.id.toString()] ??
+                                      item.unitPrice
                                     }
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell className="text-sm text-right font-medium">
-                                ₹{effectiveTotal.toLocaleString()}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+                                    onChange={(e) => {
+                                      const val =
+                                        Number.parseFloat(e.target.value) || 0;
+                                      setPriceOverrides((prev) => ({
+                                        ...prev,
+                                        [item.id.toString()]: val,
+                                      }));
+                                    }}
+                                    onBlur={async (e) => {
+                                      const val =
+                                        Number.parseFloat(e.target.value) || 0;
+                                      try {
+                                        await actor?.updateMOQItem(
+                                          item.id,
+                                          item.itemName,
+                                          item.category,
+                                          item.quantity,
+                                          item.unit,
+                                          item.brand,
+                                          val,
+                                        );
+                                        queryClient.invalidateQueries({
+                                          queryKey: ["moq"],
+                                        });
+                                      } catch {
+                                        toast.error("Failed to update price");
+                                      }
+                                    }}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-sm text-right font-medium">
+                                  ₹{effectiveTotal.toLocaleString()}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                 ))}
 
@@ -2217,12 +1860,13 @@ export function ProjectWizard({
       {/* ───────────────────────────────────────────────
           Navigation
       ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex items-center justify-between pt-2 gap-3">
         <Button
           type="button"
           variant="outline"
           onClick={() => (step === 0 ? onComplete() : setStep((s) => s - 1))}
-          className="gap-2"
+          className="gap-2 min-h-[44px] sm:min-h-0"
+          data-ocid="wizard.cancel_button"
         >
           <ChevronLeft className="h-4 w-4" />
           {step === 0 ? "Cancel" : "Back"}
@@ -2230,47 +1874,39 @@ export function ProjectWizard({
 
         {step < 3 ? (
           step === 1 ? (
-            // Step 2: "Next" only enabled after MOQ is generated and not polling
+            // Step 2: "Next" only enabled after MOQ is generated
             <TooltipProvider delayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span
                     className={
-                      !moqGenerated || isRegenMOQ || isFetchingMOQ
-                        ? "cursor-not-allowed"
-                        : ""
+                      !moqGenerated || isRegenMOQ ? "cursor-not-allowed" : ""
                     }
                   >
                     <Button
                       type="button"
                       onClick={() => setStep(2)}
-                      disabled={!moqGenerated || isRegenMOQ || isFetchingMOQ}
-                      className="gap-2"
-                      data-ocid="wizard.pagination_next"
+                      disabled={!moqGenerated || isRegenMOQ}
+                      className="gap-2 min-h-[44px] sm:min-h-0 w-full sm:w-auto"
+                      data-ocid="wizard.primary_button"
                     >
-                      {isRegenMOQ || isFetchingMOQ ? (
+                      {isRegenMOQ ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <ChevronRight className="h-4 w-4" />
                       )}
-                      {isFetchingMOQ
-                        ? "Fetching MOQ..."
-                        : isRegenMOQ
-                          ? "Updating MOQ..."
-                          : "Next →"}
+                      {isRegenMOQ ? "Updating MOQ..." : "Next →"}
                     </Button>
                   </span>
                 </TooltipTrigger>
-                {(!moqGenerated || isRegenMOQ || isFetchingMOQ) && (
+                {(!moqGenerated || isRegenMOQ) && (
                   <TooltipContent
                     side="top"
                     className="text-xs max-w-[200px] text-center"
                   >
-                    {isFetchingMOQ
-                      ? "Fetching MOQ data from backend..."
-                      : isRegenMOQ
-                        ? "Please wait while MOQ is being updated..."
-                        : "Generate MOQ above to continue"}
+                    {isRegenMOQ
+                      ? "Please wait while MOQ is being updated..."
+                      : "Generate MOQ above to continue"}
                   </TooltipContent>
                 )}
               </Tooltip>
@@ -2280,7 +1916,8 @@ export function ProjectWizard({
               type="button"
               onClick={() => setStep((s) => s + 1)}
               disabled={step === 0 && !canProceedStep1}
-              className="gap-2"
+              className="gap-2 min-h-[44px] sm:min-h-0 w-full sm:w-auto"
+              data-ocid="wizard.primary_button"
             >
               Next
               <ChevronRight className="h-4 w-4" />
@@ -2291,7 +1928,8 @@ export function ProjectWizard({
             type="button"
             onClick={handleCreateQuotation}
             disabled={isSubmitting}
-            className="gap-2"
+            className="gap-2 min-h-[44px] sm:min-h-0 w-full sm:w-auto"
+            data-ocid="wizard.submit_button"
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />

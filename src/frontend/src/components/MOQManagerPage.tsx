@@ -9,6 +9,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -39,10 +46,11 @@ import {
   IndianRupee,
   Loader2,
   PackagePlus,
+  Pencil,
   Save,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   type MOQItem,
@@ -323,6 +331,14 @@ function MOQCategorySection({
   const [rowEdits, setRowEdits] = useState<RowEdits>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [mobileEditItem, setMobileEditItem] = useState<MOQItem | null>(null);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   const getEdit = (item: MOQItem): EditableRow => {
     const key = item.id.toString();
@@ -361,6 +377,7 @@ function MOQCategorySection({
         delete next[key];
         return next;
       });
+      if (mobileEditItem?.id === item.id) setMobileEditItem(null);
     } finally {
       setSaving((prev) => ({ ...prev, [key]: false }));
     }
@@ -390,6 +407,8 @@ function MOQCategorySection({
     return sum + qty * price;
   }, 0);
 
+  const mobileEditData = mobileEditItem ? getEdit(mobileEditItem) : null;
+
   return (
     <div className="rounded-xl border border-border overflow-hidden shadow-sm">
       {/* Category header */}
@@ -409,200 +428,390 @@ function MOQCategorySection({
         </span>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead className="text-xs font-semibold w-[22%]">
-              Item Name
-            </TableHead>
-            <TableHead className="text-xs font-semibold w-[14%]">
-              Category
-            </TableHead>
-            <TableHead className="text-xs font-semibold w-[16%]">
-              Brand
-            </TableHead>
-            <TableHead className="text-xs font-semibold w-[8%] text-right">
-              Qty
-            </TableHead>
-            <TableHead className="text-xs font-semibold w-[7%]">Unit</TableHead>
-            <TableHead className="text-xs font-semibold w-[12%] text-right">
-              Unit Price (₹)
-            </TableHead>
-            <TableHead className="text-xs font-semibold w-[12%] text-right">
-              Total (₹)
-            </TableHead>
-            <TableHead className="text-xs font-semibold w-[9%] text-center">
-              Actions
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((item) => {
-            const key = item.id.toString();
-            const edit = getEdit(item);
-            const isDirty =
-              rowEdits[key] && Object.keys(rowEdits[key]).length > 0;
-            const isSaving = saving[key];
-            const isDeleting = deleting[key];
-            const rowTotal =
-              (Number.parseFloat(edit.quantity) || 0) *
-              (Number.parseFloat(edit.unitPrice) || 0);
+      <div className="overflow-x-auto">
+        <Table className="min-w-[700px] w-full">
+          <TableHeader>
+            <TableRow className="bg-muted/30 hover:bg-muted/30">
+              <TableHead className="text-xs font-semibold w-[22%]">
+                Item Name
+              </TableHead>
+              <TableHead className="text-xs font-semibold w-[14%]">
+                Category
+              </TableHead>
+              <TableHead className="text-xs font-semibold w-[16%]">
+                Brand
+              </TableHead>
+              <TableHead className="text-xs font-semibold w-[8%] text-right">
+                Qty
+              </TableHead>
+              <TableHead className="text-xs font-semibold w-[7%]">
+                Unit
+              </TableHead>
+              <TableHead className="text-xs font-semibold w-[12%] text-right">
+                Unit Price (₹)
+              </TableHead>
+              <TableHead className="text-xs font-semibold w-[12%] text-right">
+                Total (₹)
+              </TableHead>
+              <TableHead className="text-xs font-semibold w-[9%] text-center">
+                Actions
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item, idx) => {
+              const key = item.id.toString();
+              const edit = getEdit(item);
+              const isDirty =
+                rowEdits[key] && Object.keys(rowEdits[key]).length > 0;
+              const isSaving = saving[key];
+              const isDeleting = deleting[key];
+              const rowTotal =
+                (Number.parseFloat(edit.quantity) || 0) *
+                (Number.parseFloat(edit.unitPrice) || 0);
 
-            return (
-              <TableRow
-                key={key}
-                className={`
-                  transition-colors group
-                  ${isDirty ? "bg-solar/8 hover:bg-solar/12" : "hover:bg-solar/5"}
-                  ${isDeleting ? "opacity-50" : ""}
-                `}
-              >
-                {/* Item Name */}
-                <TableCell className="py-1.5 pr-1">
-                  <Input
-                    value={edit.itemName}
-                    onChange={(e) =>
-                      updateEdit(item.id, "itemName", e.target.value)
-                    }
-                    className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar focus:bg-white transition-colors px-2"
-                    placeholder="Item name"
-                  />
-                </TableCell>
+              return (
+                <TableRow
+                  key={key}
+                  data-ocid={`moq.item.${idx + 1}`}
+                  className={`
+                    transition-colors group
+                    ${isDirty ? "bg-solar/8 hover:bg-solar/12" : "hover:bg-solar/5"}
+                    ${isDeleting ? "opacity-50" : ""}
+                  `}
+                >
+                  {/* Item Name — desktop inline, mobile shows truncated */}
+                  <TableCell className="py-1.5 pr-1">
+                    {isMobile ? (
+                      <span className="text-xs font-medium truncate max-w-[120px] block">
+                        {edit.itemName}
+                      </span>
+                    ) : (
+                      <Input
+                        value={edit.itemName}
+                        onChange={(e) =>
+                          updateEdit(item.id, "itemName", e.target.value)
+                        }
+                        className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar focus:bg-white transition-colors px-2"
+                        placeholder="Item name"
+                      />
+                    )}
+                  </TableCell>
 
-                {/* Category */}
-                <TableCell className="py-1.5 pr-1">
-                  <Select
-                    value={edit.category}
-                    onValueChange={(v) => updateEdit(item.id, "category", v)}
-                  >
-                    <SelectTrigger className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar transition-colors">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((c) => (
-                        <SelectItem key={c} value={c} className="text-xs">
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
+                  {/* Category */}
+                  <TableCell className="py-1.5 pr-1">
+                    {isMobile ? (
+                      <span className="text-xs text-muted-foreground">
+                        {edit.category}
+                      </span>
+                    ) : (
+                      <Select
+                        value={edit.category}
+                        onValueChange={(v) =>
+                          updateEdit(item.id, "category", v)
+                        }
+                      >
+                        <SelectTrigger className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar transition-colors">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map((c) => (
+                            <SelectItem key={c} value={c} className="text-xs">
+                              {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </TableCell>
 
-                {/* Brand */}
-                <TableCell className="py-1.5 pr-1">
-                  <Input
-                    value={edit.brand}
-                    onChange={(e) =>
-                      updateEdit(item.id, "brand", e.target.value)
-                    }
-                    className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar focus:bg-white transition-colors px-2"
-                    placeholder="Brand"
-                  />
-                </TableCell>
+                  {/* Brand */}
+                  <TableCell className="py-1.5 pr-1">
+                    {isMobile ? (
+                      <span className="text-xs text-muted-foreground">
+                        {edit.brand || "—"}
+                      </span>
+                    ) : (
+                      <Input
+                        value={edit.brand}
+                        onChange={(e) =>
+                          updateEdit(item.id, "brand", e.target.value)
+                        }
+                        className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar focus:bg-white transition-colors px-2"
+                        placeholder="Brand"
+                      />
+                    )}
+                  </TableCell>
 
-                {/* Quantity */}
-                <TableCell className="py-1.5 pr-1">
+                  {/* Quantity */}
+                  <TableCell className="py-1.5 pr-1">
+                    {isMobile ? (
+                      <span className="text-xs text-right block">
+                        {edit.quantity}
+                      </span>
+                    ) : (
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={edit.quantity}
+                        onChange={(e) =>
+                          updateEdit(item.id, "quantity", e.target.value)
+                        }
+                        className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar focus:bg-white transition-colors px-2 text-right"
+                      />
+                    )}
+                  </TableCell>
+
+                  {/* Unit */}
+                  <TableCell className="py-1.5 pr-1">
+                    {isMobile ? (
+                      <span className="text-xs text-muted-foreground">
+                        {edit.unit}
+                      </span>
+                    ) : (
+                      <Select
+                        value={edit.unit}
+                        onValueChange={(v) => updateEdit(item.id, "unit", v)}
+                      >
+                        <SelectTrigger className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar transition-colors">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNITS.map((u) => (
+                            <SelectItem key={u} value={u} className="text-xs">
+                              {u}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </TableCell>
+
+                  {/* Unit Price */}
+                  <TableCell className="py-1.5 pr-1">
+                    {isMobile ? (
+                      <span className="text-xs text-right block">
+                        ₹{Number.parseFloat(edit.unitPrice).toLocaleString()}
+                      </span>
+                    ) : (
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                          ₹
+                        </span>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={edit.unitPrice}
+                          onChange={(e) =>
+                            updateEdit(item.id, "unitPrice", e.target.value)
+                          }
+                          className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar focus:bg-white transition-colors pl-5 pr-2 text-right"
+                        />
+                      </div>
+                    )}
+                  </TableCell>
+
+                  {/* Total */}
+                  <TableCell className="py-1.5 text-right">
+                    <span
+                      className={`text-xs font-semibold tabular-nums ${isDirty ? "text-solar-dark" : "text-foreground"}`}
+                    >
+                      ₹{Math.round(rowTotal).toLocaleString()}
+                    </span>
+                  </TableCell>
+
+                  {/* Actions */}
+                  <TableCell className="py-1.5">
+                    <div className="flex items-center justify-center gap-1">
+                      {isMobile ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 rounded-md text-navy hover:bg-navy/10"
+                          onClick={() => {
+                            setMobileEditItem(item);
+                          }}
+                          title="Edit item"
+                          data-ocid="moq.edit_button"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-7 w-7 rounded-md transition-all ${
+                            isDirty
+                              ? "text-navy bg-navy/10 hover:bg-navy hover:text-white"
+                              : "text-muted-foreground hover:text-navy opacity-0 group-hover:opacity-100"
+                          }`}
+                          onClick={() => handleSave(item)}
+                          disabled={isSaving || isDeleting}
+                          title="Save changes"
+                          data-ocid="moq.save_button"
+                        >
+                          {isSaving ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Save className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-7 w-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all ${isMobile ? "" : "opacity-0 group-hover:opacity-100"}`}
+                        onClick={() => handleDelete(item)}
+                        disabled={isSaving || isDeleting}
+                        title="Delete item"
+                        data-ocid="moq.delete_button"
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Mobile edit drawer */}
+      {mobileEditItem && mobileEditData && (
+        <Drawer
+          open={!!mobileEditItem}
+          onOpenChange={(open) => !open && setMobileEditItem(null)}
+        >
+          <DrawerContent data-ocid="moq.sheet">
+            <DrawerHeader>
+              <DrawerTitle className="text-sm">Edit MOQ Item</DrawerTitle>
+              <p className="text-xs text-muted-foreground truncate">
+                {mobileEditItem.itemName}
+              </p>
+            </DrawerHeader>
+            <div className="px-4 py-2 space-y-3 overflow-y-auto max-h-[55vh]">
+              <div>
+                <Label className="text-xs">Item Name</Label>
+                <Input
+                  className="mt-1 min-h-[44px]"
+                  value={mobileEditData.itemName}
+                  onChange={(e) =>
+                    updateEdit(mobileEditItem.id, "itemName", e.target.value)
+                  }
+                  data-ocid="moq.input"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Category</Label>
+                <Select
+                  value={mobileEditData.category}
+                  onValueChange={(v) =>
+                    updateEdit(mobileEditItem.id, "category", v)
+                  }
+                >
+                  <SelectTrigger className="mt-1 min-h-[44px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Brand</Label>
+                <Input
+                  className="mt-1 min-h-[44px]"
+                  value={mobileEditData.brand}
+                  onChange={(e) =>
+                    updateEdit(mobileEditItem.id, "brand", e.target.value)
+                  }
+                  placeholder="e.g. Waaree, Sungrow"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Quantity</Label>
                   <Input
                     type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={edit.quantity}
+                    className="mt-1 min-h-[44px]"
+                    value={mobileEditData.quantity}
                     onChange={(e) =>
-                      updateEdit(item.id, "quantity", e.target.value)
+                      updateEdit(mobileEditItem.id, "quantity", e.target.value)
                     }
-                    className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar focus:bg-white transition-colors px-2 text-right"
                   />
-                </TableCell>
-
-                {/* Unit */}
-                <TableCell className="py-1.5 pr-1">
+                </div>
+                <div>
+                  <Label className="text-xs">Unit</Label>
                   <Select
-                    value={edit.unit}
-                    onValueChange={(v) => updateEdit(item.id, "unit", v)}
+                    value={mobileEditData.unit}
+                    onValueChange={(v) =>
+                      updateEdit(mobileEditItem.id, "unit", v)
+                    }
                   >
-                    <SelectTrigger className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar transition-colors">
+                    <SelectTrigger className="mt-1 min-h-[44px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {UNITS.map((u) => (
-                        <SelectItem key={u} value={u} className="text-xs">
+                        <SelectItem key={u} value={u}>
                           {u}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </TableCell>
-
-                {/* Unit Price */}
-                <TableCell className="py-1.5 pr-1">
-                  <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
-                      ₹
-                    </span>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={edit.unitPrice}
-                      onChange={(e) =>
-                        updateEdit(item.id, "unitPrice", e.target.value)
-                      }
-                      className="h-7 text-xs border-transparent bg-transparent hover:border-border focus:border-solar focus:bg-white transition-colors pl-5 pr-2 text-right"
-                    />
-                  </div>
-                </TableCell>
-
-                {/* Total */}
-                <TableCell className="py-1.5 text-right">
-                  <span
-                    className={`text-xs font-semibold tabular-nums ${isDirty ? "text-solar-dark" : "text-foreground"}`}
-                  >
-                    ₹{Math.round(rowTotal).toLocaleString()}
-                  </span>
-                </TableCell>
-
-                {/* Actions */}
-                <TableCell className="py-1.5">
-                  <div className="flex items-center justify-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`h-7 w-7 rounded-md transition-all ${
-                        isDirty
-                          ? "text-navy bg-navy/10 hover:bg-navy hover:text-white"
-                          : "text-muted-foreground hover:text-navy opacity-0 group-hover:opacity-100"
-                      }`}
-                      onClick={() => handleSave(item)}
-                      disabled={isSaving || isDeleting}
-                      title="Save changes"
-                    >
-                      {isSaving ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Save className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100"
-                      onClick={() => handleDelete(item)}
-                      disabled={isSaving || isDeleting}
-                      title="Delete item"
-                    >
-                      {isDeleting ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Unit Price (₹)</Label>
+                <Input
+                  type="number"
+                  className="mt-1 min-h-[44px]"
+                  value={mobileEditData.unitPrice}
+                  onChange={(e) =>
+                    updateEdit(mobileEditItem.id, "unitPrice", e.target.value)
+                  }
+                />
+              </div>
+            </div>
+            <DrawerFooter className="gap-2 pt-2">
+              <Button
+                onClick={() => handleSave(mobileEditItem)}
+                disabled={saving[mobileEditItem.id.toString()]}
+                className="w-full min-h-[44px]"
+                data-ocid="moq.save_button"
+              >
+                {saving[mobileEditItem.id.toString()] ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                {saving[mobileEditItem.id.toString()]
+                  ? "Saving..."
+                  : "Save Changes"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setMobileEditItem(null)}
+                className="w-full min-h-[44px]"
+                data-ocid="moq.cancel_button"
+              >
+                Cancel
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      )}
     </div>
   );
 }

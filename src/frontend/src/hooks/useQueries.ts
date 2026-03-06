@@ -43,35 +43,9 @@ export function useProjects() {
     queryKey: ["projects"],
     queryFn: async () => {
       if (!actor) return [];
-      const all = await actor.listProjects();
-      const deletedRaw = localStorage.getItem("solarEPC_deletedProjects");
-      const deleted: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
-      if (deleted.length === 0) return all;
-      return all.filter((p) => !deleted.includes(p.id.toString()));
+      return actor.listProjects();
     },
     enabled: !!actor && !isFetching,
-  });
-}
-
-export function useDeleteProject() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: bigint) => {
-      const deletedRaw = localStorage.getItem("solarEPC_deletedProjects");
-      const deleted: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
-      const idStr = id.toString();
-      if (!deleted.includes(idStr)) {
-        deleted.push(idStr);
-        localStorage.setItem(
-          "solarEPC_deletedProjects",
-          JSON.stringify(deleted),
-        );
-      }
-      return id;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-    },
   });
 }
 

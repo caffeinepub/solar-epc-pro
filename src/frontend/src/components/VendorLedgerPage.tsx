@@ -101,8 +101,8 @@ function VendorLedgerModal({
             No invoices for this vendor yet.
           </p>
         ) : (
-          <div className="rounded-lg border border-border overflow-hidden">
-            <Table>
+          <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
+            <Table className="min-w-[540px] w-full">
               <TableHeader>
                 <TableRow className="bg-muted/40">
                   <TableHead className="text-xs font-semibold">
@@ -316,7 +316,7 @@ export function VendorLedgerPage({ activeRole }: VendorLedgerPageProps) {
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-[640px] w-full">
                 <TableHeader>
                   <TableRow className="bg-muted/30">
                     <TableHead className="text-xs font-semibold">

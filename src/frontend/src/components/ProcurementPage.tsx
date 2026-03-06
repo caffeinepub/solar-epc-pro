@@ -586,7 +586,7 @@ function NewEntryForm({ open, onClose, onSaved }: EntryFormProps) {
               </div>
 
               <div className="overflow-x-auto rounded-lg border border-border">
-                <Table>
+                <Table className="min-w-[640px] w-full">
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="text-xs w-[220px]">
@@ -1022,8 +1022,8 @@ function EntryDetail({
             <h4 className="text-sm font-semibold mb-2">
               Items Purchased ({entry.items.length})
             </h4>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
+            <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
+              <Table className="min-w-[400px] w-full">
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="text-xs">Item Name</TableHead>
@@ -1090,8 +1090,8 @@ function EntryDetail({
           <div>
             <h4 className="text-sm font-semibold mb-2">Advance Payments</h4>
             {advances.length > 0 ? (
-              <div className="rounded-lg border border-border overflow-hidden mb-3">
-                <Table>
+              <div className="rounded-lg border border-border overflow-hidden overflow-x-auto mb-3">
+                <Table className="min-w-[400px] w-full">
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="text-xs">#</TableHead>
@@ -1293,7 +1293,7 @@ export function ProcurementPage({ activeRole }: ProcurementPageProps) {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-[700px] w-full">
                 <TableHeader>
                   <TableRow className="bg-muted/30">
                     <TableHead className="text-xs font-semibold">

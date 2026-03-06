@@ -273,7 +273,7 @@ export function MaterialConsumedPage({
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="min-w-[560px] w-full">
                     <TableHeader>
                       <TableRow className="bg-muted/30">
                         <TableHead className="text-xs font-semibold">

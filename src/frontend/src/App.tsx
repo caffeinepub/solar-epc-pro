@@ -1,4 +1,10 @@
 import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -16,13 +22,13 @@ import {
   Hammer,
   LayoutDashboard,
   Menu,
+  MoreHorizontal,
   Package,
   Settings,
   Shield,
   ShoppingCart,
   Sun,
   Users,
-  X,
   Zap,
 } from "lucide-react";
 import { useState } from "react";
@@ -234,10 +240,210 @@ function Sidebar({
   );
 }
 
+// ── Mobile bottom navigation ─────────────────────────────────────────────────
+
+const MOBILE_BOTTOM_TABS: {
+  id: Page;
+  label: string;
+  icon: React.ElementType;
+}[] = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "projects", label: "Projects", icon: FolderOpen },
+  { id: "quotations", label: "Quotations", icon: FileText },
+  { id: "inventory", label: "Inventory", icon: Package },
+];
+
+const MORE_ITEMS_OPERATIONS: {
+  id: Page;
+  label: string;
+  icon: React.ElementType;
+}[] = [
+  { id: "moqManager", label: "MOQ Manager", icon: ClipboardList },
+  { id: "brands", label: "Brand Catalog", icon: Battery },
+  { id: "productMaster", label: "Product Master", icon: Database },
+  { id: "execution", label: "Site Execution", icon: Zap },
+  { id: "procurement", label: "Procurement", icon: ShoppingCart },
+  { id: "vendorLedger", label: "Vendor Ledger", icon: BookOpen },
+  { id: "materialConsumed", label: "Material Consumed", icon: Hammer },
+];
+
+const MORE_ITEMS_ADMIN: { id: Page; label: string; icon: React.ElementType }[] =
+  [
+    { id: "users", label: "Users", icon: Users },
+    { id: "audit", label: "Audit Log", icon: Shield },
+  ];
+
+function MobileBottomNav({
+  page,
+  onNavigate,
+  activeRole,
+}: {
+  page: Page;
+  onNavigate: (p: Page) => void;
+  activeRole: string;
+}) {
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const isMoreActive =
+    !MOBILE_BOTTOM_TABS.some((t) => t.id === page) && page !== "wizard";
+
+  const filteredOps = MORE_ITEMS_OPERATIONS.filter((item) => {
+    if (activeRole === "siteEngineer") {
+      return (
+        item.id !== "vendorLedger" &&
+        item.id !== "procurement" &&
+        item.id !== "productMaster"
+      );
+    }
+    if (activeRole === "procurement") {
+      return item.id !== "materialConsumed" && item.id !== "productMaster";
+    }
+    return true;
+  });
+
+  const filteredAdmin = MORE_ITEMS_ADMIN.filter((_item) => {
+    if (activeRole === "siteEngineer") return false;
+    return true;
+  });
+
+  const handleMoreNav = (id: Page) => {
+    setMoreOpen(false);
+    onNavigate(id);
+  };
+
+  return (
+    <>
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-sidebar border-t border-sidebar-border"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        data-ocid="nav.tab"
+      >
+        <div className="flex items-stretch h-14">
+          {MOBILE_BOTTOM_TABS.map((tab) => {
+            const active = page === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => onNavigate(tab.id)}
+                data-ocid={`nav.${tab.id}.tab`}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all text-xs font-medium ${
+                  active
+                    ? "bg-solar/20 text-solar"
+                    : "text-white/60 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <tab.icon
+                  className={`h-4.5 w-4.5 ${active ? "text-solar" : "text-white/60"}`}
+                  style={{ width: "18px", height: "18px" }}
+                />
+                <span className="text-[10px] leading-tight">{tab.label}</span>
+              </button>
+            );
+          })}
+          {/* More tab */}
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            data-ocid="nav.more.tab"
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all text-xs font-medium ${
+              isMoreActive
+                ? "bg-solar/20 text-solar"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <MoreHorizontal
+              style={{ width: "18px", height: "18px" }}
+              className={isMoreActive ? "text-solar" : "text-white/60"}
+            />
+            <span className="text-[10px] leading-tight">More</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* More drawer */}
+      <Drawer open={moreOpen} onOpenChange={setMoreOpen}>
+        <DrawerContent className="max-h-[75vh]" data-ocid="nav.more.sheet">
+          <DrawerHeader className="pb-2">
+            <DrawerTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              More Options
+            </DrawerTitle>
+          </DrawerHeader>
+          <div className="overflow-y-auto pb-6 px-4 space-y-4">
+            {filteredOps.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Operations
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {filteredOps.map((item) => {
+                    const active = page === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleMoreNav(item.id)}
+                        data-ocid={`nav.${item.id}.button`}
+                        className={`flex items-center gap-2.5 p-3 rounded-lg border transition-all text-left ${
+                          active
+                            ? "bg-solar/15 border-solar/40 text-navy font-semibold"
+                            : "border-border hover:border-solar/40 hover:bg-solar/5"
+                        }`}
+                      >
+                        <item.icon
+                          className={`h-4 w-4 flex-shrink-0 ${active ? "text-navy" : "text-muted-foreground"}`}
+                        />
+                        <span className="text-sm font-medium">
+                          {item.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {filteredAdmin.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Admin
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {filteredAdmin.map((item) => {
+                    const active = page === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleMoreNav(item.id)}
+                        data-ocid={`nav.${item.id}.button`}
+                        className={`flex items-center gap-2.5 p-3 rounded-lg border transition-all text-left ${
+                          active
+                            ? "bg-solar/15 border-solar/40 text-navy font-semibold"
+                            : "border-border hover:border-solar/40 hover:bg-solar/5"
+                        }`}
+                      >
+                        <item.icon
+                          className={`h-4 w-4 flex-shrink-0 ${active ? "text-navy" : "text-muted-foreground"}`}
+                        />
+                        <span className="text-sm font-medium">
+                          {item.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </>
+  );
+}
+
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<bigint | null>(
     null,
   );
@@ -253,7 +459,6 @@ export default function App() {
 
   const navigate = (p: string) => {
     setPage(p as Page);
-    setMobileOpen(false);
   };
 
   const handleSelectProject = (id: bigint) => {
@@ -277,7 +482,6 @@ export default function App() {
               setSelectedProjectId(id);
               setPage("wizard");
             }}
-            activeRole={activeRole}
           />
         );
       case "wizard":
@@ -326,49 +530,10 @@ export default function App() {
         />
       </div>
 
-      {/* Mobile sidebar overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/60 w-full cursor-default"
-            onClick={() => setMobileOpen(false)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setMobileOpen(false);
-            }}
-            aria-label="Close menu"
-          />
-          <div className="relative z-10 h-full">
-            <Sidebar
-              page={page}
-              onNavigate={navigate}
-              collapsed={false}
-              activeRole={activeRole}
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => setMobileOpen(false)}
-            className="absolute top-4 right-4 z-20 text-white"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-      )}
-
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
         <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-accent/30 flex-shrink-0 shadow-xs">
-          {/* Mobile menu button */}
-          <button
-            type="button"
-            onClick={() => setMobileOpen(true)}
-            className="md:hidden text-muted-foreground hover:text-navy transition-colors"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-
           {/* Desktop collapse button */}
           <button
             type="button"
@@ -391,7 +556,10 @@ export default function App() {
 
           {/* Role selector */}
           <Select value={activeRole} onValueChange={handleRoleChange}>
-            <SelectTrigger className="w-36 h-8 text-xs border-border bg-background">
+            <SelectTrigger
+              className="w-28 sm:w-36 h-8 text-xs border-border bg-background"
+              data-ocid="settings.select"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -417,6 +585,7 @@ export default function App() {
               onClick={() => setSettingsOpen(true)}
               className="p-1.5 rounded-md text-muted-foreground hover:text-navy hover:bg-secondary transition-colors"
               title="Company Settings"
+              data-ocid="settings.open_modal_button"
             >
               <Settings className="h-4 w-4" />
             </button>
@@ -431,11 +600,18 @@ export default function App() {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-background">
+        {/* Page content — extra bottom padding on mobile for the bottom nav */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6 bg-background">
           {renderPage()}
         </main>
       </div>
+
+      {/* Mobile bottom navigation */}
+      <MobileBottomNav
+        page={page}
+        onNavigate={(p) => setPage(p)}
+        activeRole={activeRole}
+      />
 
       <Toaster richColors />
       <SettingsSheet

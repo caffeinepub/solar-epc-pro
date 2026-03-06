@@ -8,6 +8,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -37,7 +44,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useActor } from "../hooks/useActor";
 import { useCreateInventoryItem, useInventory } from "../hooks/useQueries";
@@ -56,10 +63,12 @@ const INVENTORY_CATEGORIES = [
 
 function EditableQtyCell({
   itemId,
+  itemName,
   current,
   unit,
 }: {
   itemId: bigint;
+  itemName: string;
   current: bigint;
   unit: string;
 }) {
@@ -68,12 +77,18 @@ function EditableQtyCell({
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(current.toString());
   const [saving, setSaving] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   const save = async () => {
     if (!actor) return;
     setSaving(true);
     try {
-      // Stock update acknowledged (backend update via inventory API coming soon)
       void actor;
       void itemId;
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
@@ -94,8 +109,12 @@ function EditableQtyCell({
         </span>
         <button
           type="button"
-          onClick={() => setEditing(true)}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-navy"
+          onClick={() => {
+            setValue(current.toString());
+            setEditing(true);
+          }}
+          className="opacity-0 group-hover:opacity-100 md:transition-opacity text-muted-foreground hover:text-navy"
+          data-ocid="inventory.edit_button"
         >
           <Pencil className="h-3 w-3" />
         </button>
@@ -103,6 +122,77 @@ function EditableQtyCell({
     );
   }
 
+  // Mobile: bottom drawer
+  if (isMobile) {
+    return (
+      <>
+        <div className="flex items-center gap-1.5">
+          <span className="font-medium">
+            {current.toString()} {unit}
+          </span>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+        <Drawer
+          open={editing}
+          onOpenChange={(open) => !open && setEditing(false)}
+        >
+          <DrawerContent data-ocid="inventory.sheet">
+            <DrawerHeader>
+              <DrawerTitle className="text-sm">Edit Stock Quantity</DrawerTitle>
+              <p className="text-xs text-muted-foreground truncate">
+                {itemName}
+              </p>
+            </DrawerHeader>
+            <div className="px-4 py-2">
+              <Label className="text-xs">New Quantity ({unit})</Label>
+              <Input
+                type="number"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                className="mt-1.5 min-h-[44px] text-base"
+                autoFocus
+                data-ocid="inventory.input"
+              />
+            </div>
+            <DrawerFooter className="gap-2">
+              <Button
+                onClick={save}
+                disabled={saving}
+                className="w-full min-h-[44px]"
+                data-ocid="inventory.save_button"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Check className="h-4 w-4 mr-2" />
+                )}
+                {saving ? "Saving..." : "Save"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setValue(current.toString());
+                  setEditing(false);
+                }}
+                className="w-full min-h-[44px]"
+                data-ocid="inventory.cancel_button"
+              >
+                Cancel
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      </>
+    );
+  }
+
+  // Desktop: inline editing
   return (
     <div className="flex items-center gap-1">
       <Input
@@ -111,12 +201,14 @@ function EditableQtyCell({
         onChange={(e) => setValue(e.target.value)}
         className="h-7 w-20 text-sm px-2"
         autoFocus
+        data-ocid="inventory.input"
       />
       <button
         type="button"
         onClick={save}
         disabled={saving}
         className="text-green-400 hover:text-green-300"
+        data-ocid="inventory.save_button"
       >
         {saving ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -131,6 +223,7 @@ function EditableQtyCell({
           setEditing(false);
         }}
         className="text-muted-foreground hover:text-foreground"
+        data-ocid="inventory.cancel_button"
       >
         <X className="h-4 w-4" />
       </button>
@@ -395,65 +488,69 @@ export function InventoryPage() {
               <p className="font-medium">No items found</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-right">Min Stock</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((item) => {
-                  const isLow = item.quantityOnHand < item.minStock;
-                  return (
-                    <TableRow
-                      key={item.id.toString()}
-                      className={isLow ? "bg-destructive/5" : ""}
-                    >
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {item.sku}
-                      </TableCell>
-                      <TableCell className="font-medium text-sm">
-                        {item.name}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {item.category}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {item.warehouseLocation}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <EditableQtyCell
-                          itemId={item.id}
-                          current={item.quantityOnHand}
-                          unit={item.unit}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        {item.minStock.toString()} {item.unit}
-                      </TableCell>
-                      <TableCell>
-                        {isLow ? (
-                          <Badge className="bg-destructive/20 text-red-400 text-xs border-destructive/30">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            Low
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-green-100 text-green-700 text-xs border-green-200">
-                            OK
-                          </Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <div className="relative overflow-x-auto -mx-0 md:mx-0">
+              <Table className="min-w-[640px] w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>SKU</TableHead>
+                    <TableHead>Item Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead className="text-right">Stock</TableHead>
+                    <TableHead className="text-right">Min Stock</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((item, idx) => {
+                    const isLow = item.quantityOnHand < item.minStock;
+                    return (
+                      <TableRow
+                        key={item.id.toString()}
+                        data-ocid={`inventory.item.${idx + 1}`}
+                        className={isLow ? "bg-destructive/5" : ""}
+                      >
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {item.sku}
+                        </TableCell>
+                        <TableCell className="font-medium text-sm truncate max-w-[140px] md:max-w-none">
+                          {item.name}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {item.category}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {item.warehouseLocation}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <EditableQtyCell
+                            itemId={item.id}
+                            itemName={item.name}
+                            current={item.quantityOnHand}
+                            unit={item.unit}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {item.minStock.toString()} {item.unit}
+                        </TableCell>
+                        <TableCell>
+                          {isLow ? (
+                            <Badge className="bg-destructive/20 text-red-400 text-xs border-destructive/30">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Low
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-green-100 text-green-700 text-xs border-green-200">
+                              OK
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -63,38 +63,43 @@ export function AuditLogPage() {
             </div>
           ) : (
             <ScrollArea className="h-[60vh]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-36">Timestamp</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Target</TableHead>
-                    <TableHead>Details</TableHead>
-                    <TableHead className="text-right">User ID</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {auditLog.map((entry) => (
-                    <TableRow key={entry.id.toString()}>
-                      <TableCell className="text-xs text-muted-foreground font-mono whitespace-nowrap">
-                        {formatTimestamp(entry.timestamp)}
-                      </TableCell>
-                      <TableCell className="text-sm font-medium">
-                        {entry.action}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {entry.targetEntity}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
-                        {entry.details}
-                      </TableCell>
-                      <TableCell className="text-right text-xs font-mono text-muted-foreground">
-                        {entry.performedBy.toString()}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[640px] w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-36">Timestamp</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Target</TableHead>
+                      <TableHead>Details</TableHead>
+                      <TableHead className="text-right">User ID</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {auditLog.map((entry, idx) => (
+                      <TableRow
+                        key={entry.id.toString()}
+                        data-ocid={`audit.item.${idx + 1}`}
+                      >
+                        <TableCell className="text-xs text-muted-foreground font-mono whitespace-nowrap">
+                          {formatTimestamp(entry.timestamp)}
+                        </TableCell>
+                        <TableCell className="text-sm font-medium">
+                          {entry.action}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {entry.targetEntity}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
+                          {entry.details}
+                        </TableCell>
+                        <TableCell className="text-right text-xs font-mono text-muted-foreground">
+                          {entry.performedBy.toString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </ScrollArea>
           )}
         </CardContent>

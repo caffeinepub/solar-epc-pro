@@ -220,51 +220,58 @@ export function UsersPage() {
               <p className="font-medium">No users yet</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id.toString()}>
-                    <TableCell>
-                      <div className="flex items-center gap-2.5">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-solar text-navy text-xs font-bold">
-                            {getInitials(user.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium text-sm">{user.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {user.email}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={`text-xs ${roleColors[user.role]}`}>
-                        {roleLabels[user.role] ?? user.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={
-                          user.isActive
-                            ? "bg-green-100 text-green-700 text-xs border border-green-200"
-                            : "bg-muted text-muted-foreground text-xs"
-                        }
-                      >
-                        {user.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table className="min-w-[500px] w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user, idx) => (
+                    <TableRow
+                      key={user.id.toString()}
+                      data-ocid={`users.item.${idx + 1}`}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2.5">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-solar text-navy text-xs font-bold">
+                              {getInitials(user.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium text-sm">
+                            {user.name}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground truncate max-w-[140px] md:max-w-none">
+                        {user.email}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`text-xs ${roleColors[user.role]}`}>
+                          {roleLabels[user.role] ?? user.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            user.isActive
+                              ? "bg-green-100 text-green-700 text-xs border border-green-200"
+                              : "bg-muted text-muted-foreground text-xs"
+                          }
+                        >
+                          {user.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
