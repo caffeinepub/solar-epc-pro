@@ -34,7 +34,7 @@ import { useBrands, useCreateBrand } from "../hooks/useQueries";
 const BRAND_CATEGORIES = [...STATIC_BRAND_CATEGORIES];
 
 export function BrandCatalog() {
-  const { data: brands, isLoading, isError } = useBrands();
+  const { data: brands, isLoading, isError, isFetching } = useBrands();
   const createBrand = useCreateBrand();
   const { actor } = useActor();
   const queryClient = useQueryClient();
@@ -45,13 +45,15 @@ export function BrandCatalog() {
   const [loadTimeout, setLoadTimeout] = useState(false);
 
   useEffect(() => {
-    if (!isLoading) {
+    // Reset timeout whenever loading starts fresh (not background refetch)
+    if (!isLoading && !isFetching) {
       setLoadTimeout(false);
       return;
     }
-    const timer = setTimeout(() => setLoadTimeout(true), 4000);
+    if (!isLoading) return; // background refetch — don't restart timeout
+    const timer = setTimeout(() => setLoadTimeout(true), 5000);
     return () => clearTimeout(timer);
-  }, [isLoading]);
+  }, [isLoading, isFetching]);
 
   const [form, setForm] = useState({
     category: "Solar Panel",
@@ -80,7 +82,8 @@ export function BrandCatalog() {
         await actor.createBrand(mb.category, mb.name, true);
         imported++;
       }
-      queryClient.invalidateQueries({ queryKey: ["brands"] });
+      await queryClient.invalidateQueries({ queryKey: ["brands"] });
+      await queryClient.refetchQueries({ queryKey: ["brands"] });
       toast.success(`${imported} brands imported successfully!`);
     } catch (err) {
       toast.error("Import failed. Please try again.");
@@ -127,8 +130,10 @@ export function BrandCatalog() {
     }
   };
 
-  // Use backend brands if available, otherwise fall back to static market brands
-  const useStaticFallback = isError || (isLoading && loadTimeout);
+  // Use static fallback only when: error AND no cached data, OR loading timed out AND no cached data
+  const hasCachedData = (brands?.length ?? 0) > 0;
+  const useStaticFallback =
+    !hasCachedData && (isError || (isLoading && loadTimeout));
 
   const brandsByCategory: Record<
     string,

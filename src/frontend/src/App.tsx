@@ -33,7 +33,8 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState } from "react";
+import type { ErrorInfo, ReactNode } from "react";
 import { AuditLogPage } from "./components/AuditLogPage";
 import { BrandCatalog } from "./components/BrandCatalog";
 import { Dashboard } from "./components/Dashboard";
@@ -50,6 +51,7 @@ import { SiteExecution } from "./components/SiteExecution";
 import { UsersPage } from "./components/UsersPage";
 import { VendorLedgerPage } from "./components/VendorLedgerPage";
 import { useIsMobile } from "./hooks/use-mobile";
+import { useActor } from "./hooks/useActor";
 
 type Page =
   | "dashboard"
@@ -519,7 +521,116 @@ function PWAInstallBanner() {
   );
 }
 
+// ── Error Boundary ────────────────────────────────────────────────────────────
+
+class AppErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: string }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: "" };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.message };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("AppErrorBoundary caught:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-screen items-center justify-center bg-background p-8">
+          <div className="max-w-md text-center space-y-4">
+            <div className="p-4 rounded-2xl bg-amber-100 inline-flex mx-auto">
+              <Sun className="h-10 w-10 text-amber-600" />
+            </div>
+            <h2 className="text-xl font-bold">Something went wrong</h2>
+            <p className="text-sm text-muted-foreground">
+              {this.state.error || "The app hit an unexpected error."}
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-5 py-2 rounded-lg bg-navy text-white text-sm font-semibold hover:bg-navy/90 transition-colors"
+            >
+              Reload App
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ── Backend loading gate ──────────────────────────────────────────────────────
+
+function AppContent() {
+  const { actor, isFetching } = useActor();
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (actor) {
+      setTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setTimedOut(true), 14_000);
+    return () => clearTimeout(t);
+  }, [actor]);
+
+  if (!actor && isFetching && !timedOut) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-solar flex items-center justify-center mx-auto animate-pulse shadow-yellow-glow">
+            <Sun className="h-7 w-7 text-navy" />
+          </div>
+          <p className="text-base font-semibold">Solar EPC Pro</p>
+          <p className="text-sm text-muted-foreground">
+            Connecting to backend...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!actor && timedOut) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background p-8">
+        <div className="max-w-md text-center space-y-4">
+          <div className="p-4 rounded-2xl bg-amber-100 inline-flex mx-auto">
+            <Sun className="h-10 w-10 text-amber-600" />
+          </div>
+          <h2 className="text-xl font-bold">Backend is starting up</h2>
+          <p className="text-sm text-muted-foreground">
+            The canister is taking longer than usual to respond. This can happen
+            after a period of inactivity.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-5 py-2 rounded-lg bg-navy text-white text-sm font-semibold hover:bg-navy/90 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <AppInner />;
+}
+
 export default function App() {
+  return (
+    <AppErrorBoundary>
+      <AppContent />
+    </AppErrorBoundary>
+  );
+}
+
+function AppInner() {
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<bigint | null>(

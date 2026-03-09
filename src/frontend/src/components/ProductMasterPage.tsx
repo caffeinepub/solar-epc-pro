@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   Database,
@@ -1523,6 +1524,7 @@ export function ProductMasterPage({ activeRole }: { activeRole?: string }) {
   const { data: products, isLoading } = useProductMaster();
   const createProductMaster = useCreateProductMaster();
   const updateProductMaster = useUpdateProductMaster();
+  const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("Solar Panel");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1644,10 +1646,11 @@ export function ProductMasterPage({ activeRole }: { activeRole?: string }) {
 
       if (imported > 0) {
         toast.success(
-          `Imported ${imported} products${failed > 0 ? ` (${failed} failed)` : ""}. Refreshing...`,
+          `Imported ${imported} products${failed > 0 ? ` (${failed} failed)` : ""}. Loading...`,
         );
-        // Force page refresh to show imported data
-        window.location.reload();
+        // Invalidate and refetch without reloading the page
+        await queryClient.invalidateQueries({ queryKey: ["productMaster"] });
+        await queryClient.refetchQueries({ queryKey: ["productMaster"] });
       } else {
         toast.error(
           "No products were imported — all may already exist or backend rejected them.",

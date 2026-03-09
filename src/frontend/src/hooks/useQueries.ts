@@ -37,15 +37,35 @@ export type {
   ProductMaster,
 };
 
+// Wraps any backend call with a timeout so queries fail fast instead of buffering forever
+function withTimeout<T>(promise: Promise<T>, ms = 10_000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              "Backend request timed out. The canister may be offline.",
+            ),
+          ),
+        ms,
+      ),
+    ),
+  ]);
+}
+
 export function useProjects() {
   const { actor, isFetching } = useActor();
   return useQuery<Project[]>({
     queryKey: ["projects"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listProjects();
+      return withTimeout(actor.listProjects());
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
+    retryDelay: 2000,
   });
 }
 
@@ -55,9 +75,11 @@ export function useGetProject(id: bigint | null) {
     queryKey: ["project", id?.toString()],
     queryFn: async () => {
       if (!actor || id === null) return null;
-      return actor.getProject(id);
+      return withTimeout(actor.getProject(id));
     },
     enabled: !!actor && !isFetching && id !== null,
+    retry: 1,
+    retryDelay: 2000,
   });
 }
 
@@ -67,7 +89,7 @@ export function useBrands() {
     queryKey: ["brands"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listBrands();
+      return withTimeout(actor.listBrands());
     },
     enabled: !!actor && !isFetching,
     retry: 2,
@@ -82,9 +104,11 @@ export function useInventory() {
     queryKey: ["inventory"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listInventory();
+      return withTimeout(actor.listInventory());
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
+    retryDelay: 2000,
   });
 }
 
@@ -94,9 +118,11 @@ export function useQuotations() {
     queryKey: ["quotations"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listQuotations();
+      return withTimeout(actor.listQuotations());
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
+    retryDelay: 2000,
   });
 }
 
@@ -106,9 +132,11 @@ export function useUsers() {
     queryKey: ["users"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listUsers();
+      return withTimeout(actor.listUsers());
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
+    retryDelay: 2000,
   });
 }
 
@@ -118,9 +146,11 @@ export function useAuditLog() {
     queryKey: ["auditLog"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getAuditLog();
+      return withTimeout(actor.getAuditLog());
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
+    retryDelay: 2000,
   });
 }
 
@@ -130,9 +160,11 @@ export function useMOQ(projectId: bigint | null) {
     queryKey: ["moq", projectId?.toString()],
     queryFn: async () => {
       if (!actor || projectId === null) return [];
-      return actor.listMOQ(projectId);
+      return withTimeout(actor.listMOQ(projectId));
     },
     enabled: !!actor && !isFetching && projectId !== null,
+    retry: 1,
+    retryDelay: 2000,
   });
 }
 
@@ -431,9 +463,11 @@ export function useProductMaster() {
     queryKey: ["productMaster"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listProductMaster();
+      return withTimeout(actor.listProductMaster());
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
+    retryDelay: 2000,
   });
 }
 
@@ -443,9 +477,11 @@ export function useProductMasterByCategory(category: string) {
     queryKey: ["productMaster", category],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listProductMasterByCategory(category);
+      return withTimeout(actor.listProductMasterByCategory(category));
     },
     enabled: !!actor && !isFetching && !!category,
+    retry: 1,
+    retryDelay: 2000,
   });
 }
 
