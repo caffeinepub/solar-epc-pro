@@ -135,6 +135,7 @@ export interface backendInterface {
     createUser(name: string, email: string, role: UserRole, isActive: boolean): Promise<bigint>;
     deleteMOQItem(id: bigint): Promise<void>;
     deleteProductMaster(id: bigint): Promise<void>;
+    deleteProject(id: bigint): Promise<void>;
     generateMOQ(projectId: bigint): Promise<void>;
     generateMOQWithProducts(projectId: bigint, panelProductId: bigint | null, inverterProductId: bigint | null, batteryProductId: bigint | null, cableProductId: bigint | null, structureProductId: bigint | null): Promise<void>;
     getAuditLog(): Promise<Array<AuditEntry>>;

@@ -213,6 +213,7 @@ export const idlService = IDL.Service({
     ),
   'deleteMOQItem' : IDL.Func([IDL.Nat], [], []),
   'deleteProductMaster' : IDL.Func([IDL.Nat], [], []),
+  'deleteProject' : IDL.Func([IDL.Nat], [], []),
   'generateMOQ' : IDL.Func([IDL.Nat], [], []),
   'generateMOQWithProducts' : IDL.Func(
       [
@@ -501,6 +502,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'deleteMOQItem' : IDL.Func([IDL.Nat], [], []),
     'deleteProductMaster' : IDL.Func([IDL.Nat], [], []),
+    'deleteProject' : IDL.Func([IDL.Nat], [], []),
     'generateMOQ' : IDL.Func([IDL.Nat], [], []),
     'generateMOQWithProducts' : IDL.Func(
         [

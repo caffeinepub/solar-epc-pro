@@ -47,7 +47,12 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useActor } from "../hooks/useActor";
-import { useCreateInventoryItem, useInventory } from "../hooks/useQueries";
+import {
+  useCreateInventoryItem,
+  useInventory,
+  useProjects,
+} from "../hooks/useQueries";
+import { AIProcurementForecast } from "./AIProcurementForecast";
 
 const INVENTORY_CATEGORIES = [
   "Solar Panels",
@@ -233,6 +238,7 @@ function EditableQtyCell({
 
 export function InventoryPage() {
   const { data: inventory, isLoading } = useInventory();
+  const { data: projects } = useProjects();
   const createItem = useCreateInventoryItem();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -296,6 +302,12 @@ export function InventoryPage() {
 
   return (
     <div className="space-y-5">
+      {/* AI Procurement Forecast */}
+      <AIProcurementForecast
+        projects={projects ?? []}
+        inventory={inventory ?? []}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

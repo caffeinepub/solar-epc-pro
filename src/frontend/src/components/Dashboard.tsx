@@ -15,9 +15,11 @@ import { ProjectStatus } from "../backend.d";
 import {
   useAuditLog,
   useInventory,
+  useProductMaster,
   useProjects,
   useQuotations,
 } from "../hooks/useQueries";
+import { AIInsightsPanel } from "./AIInsightsPanel";
 
 const statusColors: Record<string, string> = {
   [ProjectStatus.draft]: "bg-muted text-muted-foreground",
@@ -92,6 +94,7 @@ export function Dashboard({
   const { data: inventory, isLoading: inventoryLoading } = useInventory();
   const { data: quotations } = useQuotations();
   const { data: auditLog } = useAuditLog();
+  const { data: products } = useProductMaster();
 
   const totalProjects = projects?.length ?? 0;
   const pendingQuotations =
@@ -167,6 +170,14 @@ export function Dashboard({
           </>
         )}
       </div>
+
+      {/* AI Insights Panel */}
+      <AIInsightsPanel
+        projects={projects ?? []}
+        quotations={quotations ?? []}
+        inventory={inventory ?? []}
+        products={products ?? []}
+      />
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* Project Status Breakdown */}

@@ -17,6 +17,7 @@ import {
   BookOpen,
   ClipboardList,
   Database,
+  Download,
   FileText,
   FolderOpen,
   Hammer,
@@ -29,9 +30,10 @@ import {
   ShoppingCart,
   Sun,
   Users,
+  X,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AuditLogPage } from "./components/AuditLogPage";
 import { BrandCatalog } from "./components/BrandCatalog";
 import { Dashboard } from "./components/Dashboard";
@@ -47,6 +49,7 @@ import { SettingsSheet } from "./components/SettingsSheet";
 import { SiteExecution } from "./components/SiteExecution";
 import { UsersPage } from "./components/UsersPage";
 import { VendorLedgerPage } from "./components/VendorLedgerPage";
+import { useIsMobile } from "./hooks/use-mobile";
 
 type Page =
   | "dashboard"
@@ -441,6 +444,81 @@ function MobileBottomNav({
   );
 }
 
+// ── PWA Install Banner ────────────────────────────────────────────────────────
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
+function PWAInstallBanner() {
+  const isMobile = useIsMobile();
+  const [showBanner, setShowBanner] = useState(false);
+  const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    const dismissed = localStorage.getItem("pwaInstallDismissed");
+    if (dismissed) return;
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      deferredPrompt.current = e as BeforeInstallPromptEvent;
+      setShowBanner(true);
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt.current) return;
+    await deferredPrompt.current.prompt();
+    const { outcome } = await deferredPrompt.current.userChoice;
+    if (outcome === "accepted") {
+      deferredPrompt.current = null;
+    }
+    setShowBanner(false);
+    localStorage.setItem("pwaInstallDismissed", "1");
+  };
+
+  const handleDismiss = () => {
+    setShowBanner(false);
+    localStorage.setItem("pwaInstallDismissed", "1");
+  };
+
+  if (!isMobile || !showBanner) return null;
+
+  return (
+    <div
+      data-ocid="pwa.install_banner"
+      className="flex items-center gap-3 px-4 py-2.5 bg-solar border-b border-solar-dark/30 text-navy"
+    >
+      <Sun className="h-4 w-4 flex-shrink-0 text-navy" />
+      <p className="flex-1 text-xs font-medium leading-tight">
+        Install Solar EPC Pro on your home screen for quick access
+      </p>
+      <button
+        type="button"
+        data-ocid="pwa.install_button"
+        onClick={handleInstall}
+        className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-navy text-white text-xs font-semibold flex-shrink-0 hover:bg-navy/90 transition-colors"
+      >
+        <Download className="h-3 w-3" />
+        Install
+      </button>
+      <button
+        type="button"
+        data-ocid="pwa.dismiss_button"
+        onClick={handleDismiss}
+        className="p-1 rounded-md text-navy/60 hover:text-navy hover:bg-navy/10 transition-colors flex-shrink-0"
+        aria-label="Dismiss install banner"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -482,6 +560,7 @@ export default function App() {
               setSelectedProjectId(id);
               setPage("wizard");
             }}
+            currentRole={activeRole}
           />
         );
       case "wizard":
@@ -599,6 +678,9 @@ export default function App() {
             </span>
           </div>
         </header>
+
+        {/* PWA Install Banner */}
+        <PWAInstallBanner />
 
         {/* Page content — extra bottom padding on mobile for the bottom nav */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6 bg-background">

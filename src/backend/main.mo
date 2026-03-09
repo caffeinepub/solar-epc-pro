@@ -3,12 +3,12 @@ import Map "mo:core/Map";
 import Time "mo:core/Time";
 import Runtime "mo:core/Runtime";
 import Array "mo:core/Array";
+import List "mo:core/List";
 import Iter "mo:core/Iter";
 import Bool "mo:core/Bool";
 import Nat "mo:core/Nat";
 import Order "mo:core/Order";
 import Float "mo:core/Float";
-import List "mo:core/List";
 
 
 // Attach migration logic via `with` clause
@@ -246,6 +246,26 @@ actor {
           batteryCapacityKWh;
         };
         projects.add(id, updatedProject);
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteProject(id : Nat) : async () {
+    switch (projects.get(id)) {
+      case (null) { Runtime.trap("Project not found") };
+      case (_project) {
+        projects.remove(id);
+
+        // Collect matching keys into a persistent List
+        let matchingKeys = List.empty<Nat>();
+        for ((key, value) in moqItems.entries()) {
+          if (value.projectId == id) { matchingKeys.add(key) };
+        };
+
+        // Convert List to Array and remove entries
+        matchingKeys.toArray().forEach(
+          func(key) { moqItems.remove(key) }
+        );
       };
     };
   };
@@ -730,4 +750,3 @@ actor {
     insertItem("Miscellaneous", "Installation Consumables", 1.0, "Set", 850.0);
   };
 };
-

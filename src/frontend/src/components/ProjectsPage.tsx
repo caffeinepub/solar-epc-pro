@@ -1,3 +1,14 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,12 +22,14 @@ import {
   Pencil,
   Plus,
   Search,
+  Trash2,
   Zap,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { ProjectStatus } from "../backend.d";
 import type { Project } from "../backend.d";
-import { useProjects } from "../hooks/useQueries";
+import { useDeleteProject, useProjects } from "../hooks/useQueries";
 
 const statusColors: Record<string, string> = {
   [ProjectStatus.draft]: "bg-muted/70 text-muted-foreground border-transparent",
@@ -49,12 +62,18 @@ const systemTypeColors: Record<string, string> = {
 
 function ProjectCard({
   project,
+  index,
   onSelect,
   onEdit,
+  onDelete,
+  currentRole,
 }: {
   project: Project;
+  index: number;
   onSelect: (id: bigint) => void;
   onEdit: (id: bigint) => void;
+  onDelete: (id: bigint) => void;
+  currentRole: string;
 }) {
   return (
     <Card className="hover:border-solar/50 transition-all cursor-pointer group shadow-blue-sm">
@@ -112,6 +131,51 @@ function ProjectCard({
             >
               <Pencil className="h-4 w-4" />
             </button>
+
+            {currentRole === "owner" && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={(e) => e.stopPropagation()}
+                    title="Delete project"
+                    data-ocid={`projects.delete_button.${index}`}
+                    className="p-1.5 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent
+                  data-ocid="projects.delete_dialog"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently remove{" "}
+                      <strong>{project.clientName}</strong> and all its MOQ
+                      items. This cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-ocid="projects.cancel_button">
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      data-ocid="projects.confirm_button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(project.id);
+                      }}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
             <button
               type="button"
               onClick={() => onSelect(project.id)}
@@ -131,14 +195,30 @@ export function ProjectsPage({
   onNewProject,
   onSelectProject,
   onEditProject,
+  currentRole,
 }: {
   onNewProject: () => void;
   onSelectProject: (id: bigint) => void;
   onEditProject: (id: bigint) => void;
+  currentRole: string;
 }) {
   const { data: projects, isLoading } = useProjects();
+  const deleteProject = useDeleteProject();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const handleDelete = (id: bigint) => {
+    deleteProject.mutate(id, {
+      onSuccess: () => {
+        toast.success("Project deleted successfully");
+      },
+      onError: (err) => {
+        toast.error(
+          `Failed to delete project: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      },
+    });
+  };
 
   const filtered = projects?.filter((p) => {
     const matchesSearch = p.clientName
@@ -163,7 +243,11 @@ export function ProjectsPage({
             {projects?.length ?? 0} total projects
           </p>
         </div>
-        <Button onClick={onNewProject} className="gap-2">
+        <Button
+          onClick={onNewProject}
+          className="gap-2"
+          data-ocid="projects.primary_button"
+        >
           <Plus className="h-4 w-4" />
           New Project
         </Button>
@@ -178,12 +262,14 @@ export function ProjectsPage({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
+            data-ocid="projects.search_input"
           />
         </div>
         <div className="flex gap-1.5 flex-wrap">
           <button
             type="button"
             onClick={() => setStatusFilter("all")}
+            data-ocid="projects.filter.tab"
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               statusFilter === "all"
                 ? "bg-navy text-white"
@@ -211,7 +297,7 @@ export function ProjectsPage({
 
       {/* Projects list */}
       {isLoading ? (
-        <div className="space-y-3">
+        <div className="space-y-3" data-ocid="projects.loading_state">
           {["a", "b", "c"].map((k) => (
             <Card key={k}>
               <CardContent className="p-4">
@@ -222,7 +308,10 @@ export function ProjectsPage({
           ))}
         </div>
       ) : !filtered || filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
+        <div
+          className="text-center py-16 text-muted-foreground"
+          data-ocid="projects.empty_state"
+        >
           <FolderOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p className="font-medium">No projects found</p>
           <p className="text-sm mt-1">
@@ -238,13 +327,16 @@ export function ProjectsPage({
           )}
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((project) => (
+        <div className="space-y-2" data-ocid="projects.list">
+          {filtered.map((project, idx) => (
             <ProjectCard
               key={project.id.toString()}
               project={project}
+              index={idx + 1}
               onSelect={onSelectProject}
               onEdit={onEditProject}
+              onDelete={handleDelete}
+              currentRole={currentRole}
             />
           ))}
         </div>

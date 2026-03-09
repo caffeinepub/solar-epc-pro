@@ -536,3 +536,18 @@ export function useDeleteProductMaster() {
     },
   });
 }
+
+export function useDeleteProject() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("No actor");
+      return actor.deleteProject(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["moq"] });
+    },
+  });
+}

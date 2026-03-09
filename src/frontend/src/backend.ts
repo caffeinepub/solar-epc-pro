@@ -217,6 +217,7 @@ export interface backendInterface {
     createUser(name: string, email: string, role: UserRole, isActive: boolean): Promise<bigint>;
     deleteMOQItem(id: bigint): Promise<void>;
     deleteProductMaster(id: bigint): Promise<void>;
+    deleteProject(id: bigint): Promise<void>;
     generateMOQ(projectId: bigint): Promise<void>;
     generateMOQWithProducts(projectId: bigint, panelProductId: bigint | null, inverterProductId: bigint | null, batteryProductId: bigint | null, cableProductId: bigint | null, structureProductId: bigint | null): Promise<void>;
     getAuditLog(): Promise<Array<AuditEntry>>;
@@ -387,6 +388,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.deleteProductMaster(arg0);
+            return result;
+        }
+    }
+    async deleteProject(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteProject(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteProject(arg0);
             return result;
         }
     }

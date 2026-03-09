@@ -43,6 +43,7 @@ import {
   getMaxRevision,
   setQuotationOverride,
 } from "../utils/quotationOverrides";
+import { AIROICard, AIROIToggleButton } from "./AIROICard";
 
 // ---- Effective status helpers ----
 
@@ -93,8 +94,13 @@ export function QuotationsPage({ activeRole }: QuotationsPageProps) {
   const { profile } = useCompanyProfile();
   const [exportingId, setExportingId] = useState<bigint | null>(null);
   const [revisingId, setRevisingId] = useState<bigint | null>(null);
+  const [expandedAIROI, setExpandedAIROI] = useState<string | null>(null);
   // Force re-render after local override mutations
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+
+  function handleToggleAIROI(id: string) {
+    setExpandedAIROI((prev) => (prev === id ? null : id));
+  }
 
   const isOwner = activeRole === "owner";
 
@@ -400,161 +406,183 @@ export function QuotationsPage({ activeRole }: QuotationsPageProps) {
                         effectiveStatus === "clientApproved" ||
                         effectiveStatus === "clientRejected";
 
+                      const isAIROIExpanded = expandedAIROI === idStr;
+
                       return (
-                        <TableRow
-                          key={idStr}
-                          data-ocid={`quotations.item.${idx + 1}`}
-                        >
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {q.proposalNumber}
-                          </TableCell>
-                          <TableCell className="font-medium text-sm truncate max-w-[120px] md:max-w-none">
-                            {q.clientName}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground truncate max-w-[100px] md:max-w-none">
-                            {q.companyName}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold text-navy">
-                            ₹{q.totalCost.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right text-sm text-green-600">
-                            ₹{q.annualSavings.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right text-sm">
-                            {q.paybackYears.toFixed(1)} yrs
-                          </TableCell>
-                          <TableCell className="text-right text-sm">
-                            {q.irr.toFixed(1)}%
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              className={`text-xs ${effectiveStatus != null ? statusColors[effectiveStatus] : statusColors[q.status]}`}
-                            >
-                              {effectiveStatus != null
-                                ? (statusLabels[effectiveStatus] ??
-                                  effectiveStatus)
-                                : (statusLabels[q.status] ?? q.status)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              {/* Approve / Reject / Reset — owner only, always visible */}
-                              {isOwner && (
-                                <>
-                                  {alreadyActioned ? (
-                                    /* When already actioned, show reset button */
+                        <>
+                          <TableRow
+                            key={idStr}
+                            data-ocid={`quotations.item.${idx + 1}`}
+                          >
+                            <TableCell className="font-mono text-xs text-muted-foreground">
+                              {q.proposalNumber}
+                            </TableCell>
+                            <TableCell className="font-medium text-sm truncate max-w-[120px] md:max-w-none">
+                              {q.clientName}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground truncate max-w-[100px] md:max-w-none">
+                              {q.companyName}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-navy">
+                              ₹{q.totalCost.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right text-sm text-green-600">
+                              ₹{q.annualSavings.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right text-sm">
+                              {q.paybackYears.toFixed(1)} yrs
+                            </TableCell>
+                            <TableCell className="text-right text-sm">
+                              {q.irr.toFixed(1)}%
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                className={`text-xs ${effectiveStatus != null ? statusColors[effectiveStatus] : statusColors[q.status]}`}
+                              >
+                                {effectiveStatus != null
+                                  ? (statusLabels[effectiveStatus] ??
+                                    effectiveStatus)
+                                  : (statusLabels[q.status] ?? q.status)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {/* Approve / Reject / Reset — owner only, always visible */}
+                                {isOwner && (
+                                  <>
+                                    {alreadyActioned ? (
+                                      /* When already actioned, show reset button */
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 w-8 p-0 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                                            onClick={() =>
+                                              handleResetStatus(idStr)
+                                            }
+                                            aria-label="Reset to Pending"
+                                          >
+                                            <RotateCcw className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top">
+                                          <p>Reset to Pending</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    ) : null}
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          className="h-8 w-8 p-0 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                                          onClick={() =>
-                                            handleResetStatus(idStr)
-                                          }
-                                          aria-label="Reset to Pending"
+                                          className={`h-8 w-8 p-0 ${isApproved ? "text-emerald-700 bg-emerald-50" : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"}`}
+                                          onClick={() => handleApprove(idStr)}
+                                          aria-label="Approve quotation"
                                         >
-                                          <RotateCcw className="h-4 w-4" />
+                                          <CheckCircle className="h-4 w-4" />
                                         </Button>
                                       </TooltipTrigger>
                                       <TooltipContent side="top">
-                                        <p>Reset to Pending</p>
+                                        <p>
+                                          {isApproved
+                                            ? "Already Approved"
+                                            : "Approve quotation"}
+                                        </p>
                                       </TooltipContent>
                                     </Tooltip>
-                                  ) : null}
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className={`h-8 w-8 p-0 ${isApproved ? "text-emerald-700 bg-emerald-50" : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"}`}
-                                        onClick={() => handleApprove(idStr)}
-                                        aria-label="Approve quotation"
-                                      >
-                                        <CheckCircle className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">
-                                      <p>
-                                        {isApproved
-                                          ? "Already Approved"
-                                          : "Approve quotation"}
-                                      </p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className={`h-8 w-8 p-0 ${isRejected ? "text-red-700 bg-red-50" : "text-red-500 hover:bg-red-50 hover:text-red-700"}`}
-                                        onClick={() => handleReject(idStr)}
-                                        aria-label="Reject quotation"
-                                      >
-                                        <XCircle className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">
-                                      <p>
-                                        {isRejected
-                                          ? "Already Rejected"
-                                          : "Reject quotation"}
-                                      </p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </>
-                              )}
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className={`h-8 w-8 p-0 ${isRejected ? "text-red-700 bg-red-50" : "text-red-500 hover:bg-red-50 hover:text-red-700"}`}
+                                          onClick={() => handleReject(idStr)}
+                                          aria-label="Reject quotation"
+                                        >
+                                          <XCircle className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        <p>
+                                          {isRejected
+                                            ? "Already Rejected"
+                                            : "Reject quotation"}
+                                        </p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </>
+                                )}
 
-                              {/* Revise — visible when not draft */}
-                              {canRevise && (
+                                {/* Revise — visible when not draft */}
+                                {canRevise && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0 text-navy hover:bg-navy/10"
+                                        onClick={() => handleRevise(q.id)}
+                                        disabled={isRevising}
+                                        aria-label="Create revision"
+                                      >
+                                        {isRevising ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <RefreshCw className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <p>Create revision (Rev+1)</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+
+                                {/* AI ROI toggle */}
+                                <AIROIToggleButton
+                                  quotationId={q.id}
+                                  isExpanded={isAIROIExpanded}
+                                  onToggle={handleToggleAIROI}
+                                />
+
+                                {/* Export PDF */}
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-8 w-8 p-0 text-navy hover:bg-navy/10"
-                                      onClick={() => handleRevise(q.id)}
-                                      disabled={isRevising}
-                                      aria-label="Create revision"
+                                      className="h-8 w-8 p-0 text-navy hover:bg-navy/10 hover:text-navy"
+                                      onClick={() => handleExportPDF(q.id)}
+                                      disabled={isExporting}
+                                      aria-label="Export as PDF"
                                     >
-                                      {isRevising ? (
+                                      {isExporting ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                       ) : (
-                                        <RefreshCw className="h-4 w-4" />
+                                        <Download className="h-4 w-4" />
                                       )}
                                     </Button>
                                   </TooltipTrigger>
-                                  <TooltipContent side="top">
-                                    <p>Create revision (Rev+1)</p>
+                                  <TooltipContent side="left">
+                                    <p>Export as PDF</p>
                                   </TooltipContent>
                                 </Tooltip>
-                              )}
-
-                              {/* Export PDF */}
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0 text-navy hover:bg-navy/10 hover:text-navy"
-                                    onClick={() => handleExportPDF(q.id)}
-                                    disabled={isExporting}
-                                    aria-label="Export as PDF"
-                                  >
-                                    {isExporting ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Download className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="left">
-                                  <p>Export as PDF</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {/* AI ROI expanded row */}
+                          {isAIROIExpanded && (
+                            <TableRow
+                              key={`${idStr}-ai-roi`}
+                              className="bg-solar/3"
+                            >
+                              <TableCell colSpan={9} className="p-0">
+                                <AIROICard quotation={q} />
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
                       );
                     })}
                   </TableBody>

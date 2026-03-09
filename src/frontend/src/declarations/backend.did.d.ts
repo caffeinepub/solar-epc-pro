@@ -178,6 +178,7 @@ export interface _SERVICE {
   'createUser' : ActorMethod<[string, string, UserRole, boolean], bigint>,
   'deleteMOQItem' : ActorMethod<[bigint], undefined>,
   'deleteProductMaster' : ActorMethod<[bigint], undefined>,
+  'deleteProject' : ActorMethod<[bigint], undefined>,
   'generateMOQ' : ActorMethod<[bigint], undefined>,
   'generateMOQWithProducts' : ActorMethod<
     [

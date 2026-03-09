@@ -58,9 +58,8 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import { MARKET_BRANDS, getBrandsByCategory } from "../data/marketBrands";
 import { useActor } from "../hooks/useActor";
-import { useBrands, useMOQ, useProductMaster } from "../hooks/useQueries";
+import { useMOQ, useProductMaster } from "../hooks/useQueries";
 import {
   QuotationStatus,
   Variant_applianceBased_consumptionBased,
@@ -68,6 +67,1111 @@ import {
   Variant_sheetMetal_rccRooftop_other_groundMount,
 } from "../hooks/useQueries";
 import { generateNextProposalNumber } from "../utils/quotationNumbering";
+import { AILoadSuggestionCard } from "./AILoadSuggestionCard";
+import { AIProductRecommendationCard } from "./AIProductRecommendationCard";
+
+// ─── Static product data for Brand Reference (fallback when backend returns nothing) ───
+type StaticProduct = {
+  id: bigint;
+  category: string;
+  brand: string;
+  productType: string;
+  capacity: string;
+  voltage: string;
+  pricePerUnit: number;
+  unit: string;
+  efficiency: number;
+  warrantyYears: bigint;
+  isActive: boolean;
+};
+
+const STATIC_PRODUCTS: StaticProduct[] = [
+  // Solar Panels
+  {
+    id: BigInt(1),
+    category: "Solar Panel",
+    brand: "Waaree",
+    productType: "Mono PERC",
+    capacity: "540W",
+    voltage: "N/A",
+    pricePerUnit: 22000,
+    unit: "Nos",
+    efficiency: 20.8,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(2),
+    category: "Solar Panel",
+    brand: "Waaree",
+    productType: "TOPCon",
+    capacity: "550W",
+    voltage: "N/A",
+    pricePerUnit: 24000,
+    unit: "Nos",
+    efficiency: 21.5,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(3),
+    category: "Solar Panel",
+    brand: "Waaree",
+    productType: "TOPCon",
+    capacity: "700W",
+    voltage: "N/A",
+    pricePerUnit: 29000,
+    unit: "Nos",
+    efficiency: 22.1,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(4),
+    category: "Solar Panel",
+    brand: "Waaree",
+    productType: "TOPCon",
+    capacity: "720W",
+    voltage: "N/A",
+    pricePerUnit: 30000,
+    unit: "Nos",
+    efficiency: 22.3,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(5),
+    category: "Solar Panel",
+    brand: "Adani Solar",
+    productType: "Mono PERC",
+    capacity: "545W",
+    voltage: "N/A",
+    pricePerUnit: 23000,
+    unit: "Nos",
+    efficiency: 21.0,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(6),
+    category: "Solar Panel",
+    brand: "Adani Solar",
+    productType: "TOPCon",
+    capacity: "600W",
+    voltage: "N/A",
+    pricePerUnit: 26000,
+    unit: "Nos",
+    efficiency: 21.8,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(7),
+    category: "Solar Panel",
+    brand: "Adani Solar",
+    productType: "Bifacial TOPCon",
+    capacity: "700W",
+    voltage: "N/A",
+    pricePerUnit: 30000,
+    unit: "Nos",
+    efficiency: 22.5,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(8),
+    category: "Solar Panel",
+    brand: "Longi Solar",
+    productType: "Mono PERC",
+    capacity: "540W",
+    voltage: "N/A",
+    pricePerUnit: 21500,
+    unit: "Nos",
+    efficiency: 20.9,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(9),
+    category: "Solar Panel",
+    brand: "Longi Solar",
+    productType: "HJT",
+    capacity: "600W",
+    voltage: "N/A",
+    pricePerUnit: 27000,
+    unit: "Nos",
+    efficiency: 23.0,
+    warrantyYears: BigInt(30),
+    isActive: true,
+  },
+  {
+    id: BigInt(10),
+    category: "Solar Panel",
+    brand: "Vikram Solar",
+    productType: "Mono PERC",
+    capacity: "540W",
+    voltage: "N/A",
+    pricePerUnit: 22500,
+    unit: "Nos",
+    efficiency: 21.0,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(11),
+    category: "Solar Panel",
+    brand: "Vikram Solar",
+    productType: "TOPCon",
+    capacity: "550W",
+    voltage: "N/A",
+    pricePerUnit: 24500,
+    unit: "Nos",
+    efficiency: 21.6,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(12),
+    category: "Solar Panel",
+    brand: "Tata Power Solar",
+    productType: "Mono PERC",
+    capacity: "500W",
+    voltage: "N/A",
+    pricePerUnit: 21000,
+    unit: "Nos",
+    efficiency: 20.5,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(13),
+    category: "Solar Panel",
+    brand: "Tata Power Solar",
+    productType: "TOPCon",
+    capacity: "545W",
+    voltage: "N/A",
+    pricePerUnit: 23500,
+    unit: "Nos",
+    efficiency: 21.2,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(14),
+    category: "Solar Panel",
+    brand: "REC Group",
+    productType: "HJT",
+    capacity: "405W",
+    voltage: "N/A",
+    pricePerUnit: 19000,
+    unit: "Nos",
+    efficiency: 22.0,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(15),
+    category: "Solar Panel",
+    brand: "Renewsys",
+    productType: "Polycrystalline",
+    capacity: "330W",
+    voltage: "N/A",
+    pricePerUnit: 12000,
+    unit: "Nos",
+    efficiency: 17.0,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(16),
+    category: "Solar Panel",
+    brand: "Renewsys",
+    productType: "Mono PERC",
+    capacity: "440W",
+    voltage: "N/A",
+    pricePerUnit: 18000,
+    unit: "Nos",
+    efficiency: 20.2,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(17),
+    category: "Solar Panel",
+    brand: "Goldi Solar",
+    productType: "TOPCon",
+    capacity: "540W",
+    voltage: "N/A",
+    pricePerUnit: 22000,
+    unit: "Nos",
+    efficiency: 21.0,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(18),
+    category: "Solar Panel",
+    brand: "Avaada",
+    productType: "Mono PERC",
+    capacity: "545W",
+    voltage: "N/A",
+    pricePerUnit: 22500,
+    unit: "Nos",
+    efficiency: 21.1,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  {
+    id: BigInt(19),
+    category: "Solar Panel",
+    brand: "Generic",
+    productType: "Polycrystalline",
+    capacity: "50W",
+    voltage: "12V",
+    pricePerUnit: 2800,
+    unit: "Nos",
+    efficiency: 15.0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(20),
+    category: "Solar Panel",
+    brand: "Generic",
+    productType: "Mono PERC",
+    capacity: "100W",
+    voltage: "12V",
+    pricePerUnit: 5200,
+    unit: "Nos",
+    efficiency: 18.0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(21),
+    category: "Solar Panel",
+    brand: "Generic",
+    productType: "Mono PERC",
+    capacity: "150W",
+    voltage: "12V",
+    pricePerUnit: 7500,
+    unit: "Nos",
+    efficiency: 18.5,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(22),
+    category: "Solar Panel",
+    brand: "Generic",
+    productType: "Mono PERC",
+    capacity: "200W",
+    voltage: "24V",
+    pricePerUnit: 9800,
+    unit: "Nos",
+    efficiency: 19.0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  // Inverters
+  {
+    id: BigInt(23),
+    category: "Inverter",
+    brand: "Sungrow",
+    productType: "String",
+    capacity: "5kW",
+    voltage: "220V AC",
+    pricePerUnit: 45000,
+    unit: "Nos",
+    efficiency: 98.4,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(24),
+    category: "Inverter",
+    brand: "Sungrow",
+    productType: "String",
+    capacity: "10kW",
+    voltage: "220V AC",
+    pricePerUnit: 75000,
+    unit: "Nos",
+    efficiency: 98.6,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(25),
+    category: "Inverter",
+    brand: "Sungrow",
+    productType: "Hybrid",
+    capacity: "5kW",
+    voltage: "220V AC",
+    pricePerUnit: 65000,
+    unit: "Nos",
+    efficiency: 97.5,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(26),
+    category: "Inverter",
+    brand: "Sungrow",
+    productType: "Hybrid",
+    capacity: "10kW",
+    voltage: "220V AC",
+    pricePerUnit: 95000,
+    unit: "Nos",
+    efficiency: 97.8,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(27),
+    category: "Inverter",
+    brand: "Growatt",
+    productType: "String",
+    capacity: "5kW",
+    voltage: "220V AC",
+    pricePerUnit: 38000,
+    unit: "Nos",
+    efficiency: 97.8,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(28),
+    category: "Inverter",
+    brand: "Growatt",
+    productType: "Hybrid",
+    capacity: "5kW",
+    voltage: "220V AC",
+    pricePerUnit: 55000,
+    unit: "Nos",
+    efficiency: 97.0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(29),
+    category: "Inverter",
+    brand: "Growatt",
+    productType: "Off-grid",
+    capacity: "3kW",
+    voltage: "24V DC",
+    pricePerUnit: 28000,
+    unit: "Nos",
+    efficiency: 93.0,
+    warrantyYears: BigInt(2),
+    isActive: true,
+  },
+  {
+    id: BigInt(30),
+    category: "Inverter",
+    brand: "Luminous",
+    productType: "Off-grid",
+    capacity: "1kW",
+    voltage: "12V DC",
+    pricePerUnit: 8500,
+    unit: "Nos",
+    efficiency: 90.0,
+    warrantyYears: BigInt(2),
+    isActive: true,
+  },
+  {
+    id: BigInt(31),
+    category: "Inverter",
+    brand: "Luminous",
+    productType: "Off-grid",
+    capacity: "2kW",
+    voltage: "24V DC",
+    pricePerUnit: 14000,
+    unit: "Nos",
+    efficiency: 92.0,
+    warrantyYears: BigInt(2),
+    isActive: true,
+  },
+  {
+    id: BigInt(32),
+    category: "Inverter",
+    brand: "Luminous",
+    productType: "Hybrid",
+    capacity: "3kW",
+    voltage: "24V DC",
+    pricePerUnit: 35000,
+    unit: "Nos",
+    efficiency: 93.5,
+    warrantyYears: BigInt(3),
+    isActive: true,
+  },
+  {
+    id: BigInt(33),
+    category: "Inverter",
+    brand: "Havells",
+    productType: "String",
+    capacity: "3kW",
+    voltage: "220V AC",
+    pricePerUnit: 30000,
+    unit: "Nos",
+    efficiency: 97.0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(34),
+    category: "Inverter",
+    brand: "Havells",
+    productType: "String",
+    capacity: "5kW",
+    voltage: "220V AC",
+    pricePerUnit: 42000,
+    unit: "Nos",
+    efficiency: 97.5,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(35),
+    category: "Inverter",
+    brand: "Microtek",
+    productType: "Off-grid",
+    capacity: "1kW",
+    voltage: "12V DC",
+    pricePerUnit: 7500,
+    unit: "Nos",
+    efficiency: 88.0,
+    warrantyYears: BigInt(2),
+    isActive: true,
+  },
+  {
+    id: BigInt(36),
+    category: "Inverter",
+    brand: "Microtek",
+    productType: "Hybrid",
+    capacity: "2kW",
+    voltage: "24V DC",
+    pricePerUnit: 22000,
+    unit: "Nos",
+    efficiency: 91.0,
+    warrantyYears: BigInt(2),
+    isActive: true,
+  },
+  {
+    id: BigInt(37),
+    category: "Inverter",
+    brand: "Solax",
+    productType: "Hybrid",
+    capacity: "5kW",
+    voltage: "220V AC",
+    pricePerUnit: 58000,
+    unit: "Nos",
+    efficiency: 97.5,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(38),
+    category: "Inverter",
+    brand: "ABB/FIMER",
+    productType: "String",
+    capacity: "10kW",
+    voltage: "400V AC",
+    pricePerUnit: 80000,
+    unit: "Nos",
+    efficiency: 98.0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(39),
+    category: "Inverter",
+    brand: "Huawei",
+    productType: "String",
+    capacity: "20kW",
+    voltage: "400V AC",
+    pricePerUnit: 140000,
+    unit: "Nos",
+    efficiency: 98.6,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(40),
+    category: "Inverter",
+    brand: "Delta",
+    productType: "String",
+    capacity: "15kW",
+    voltage: "400V AC",
+    pricePerUnit: 110000,
+    unit: "Nos",
+    efficiency: 98.2,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  // Batteries
+  {
+    id: BigInt(41),
+    category: "Battery",
+    brand: "Luminous",
+    productType: "Tubular Lead-Acid",
+    capacity: "150Ah",
+    voltage: "12V",
+    pricePerUnit: 12000,
+    unit: "Nos",
+    efficiency: 80.0,
+    warrantyYears: BigInt(3),
+    isActive: true,
+  },
+  {
+    id: BigInt(42),
+    category: "Battery",
+    brand: "Luminous",
+    productType: "Tubular Lead-Acid",
+    capacity: "200Ah",
+    voltage: "12V",
+    pricePerUnit: 15000,
+    unit: "Nos",
+    efficiency: 80.0,
+    warrantyYears: BigInt(3),
+    isActive: true,
+  },
+  {
+    id: BigInt(43),
+    category: "Battery",
+    brand: "Amaron",
+    productType: "Tubular Lead-Acid",
+    capacity: "200Ah",
+    voltage: "12V",
+    pricePerUnit: 16000,
+    unit: "Nos",
+    efficiency: 80.0,
+    warrantyYears: BigInt(3),
+    isActive: true,
+  },
+  {
+    id: BigInt(44),
+    category: "Battery",
+    brand: "Exide",
+    productType: "Tubular Lead-Acid",
+    capacity: "150Ah",
+    voltage: "12V",
+    pricePerUnit: 13000,
+    unit: "Nos",
+    efficiency: 80.0,
+    warrantyYears: BigInt(3),
+    isActive: true,
+  },
+  {
+    id: BigInt(45),
+    category: "Battery",
+    brand: "Exide",
+    productType: "Tubular Lead-Acid",
+    capacity: "200Ah",
+    voltage: "12V",
+    pricePerUnit: 16500,
+    unit: "Nos",
+    efficiency: 80.0,
+    warrantyYears: BigInt(3),
+    isActive: true,
+  },
+  {
+    id: BigInt(46),
+    category: "Battery",
+    brand: "Livguard",
+    productType: "Tubular Lead-Acid",
+    capacity: "200Ah",
+    voltage: "12V",
+    pricePerUnit: 14500,
+    unit: "Nos",
+    efficiency: 80.0,
+    warrantyYears: BigInt(3),
+    isActive: true,
+  },
+  {
+    id: BigInt(47),
+    category: "Battery",
+    brand: "Okaya",
+    productType: "Tubular Lead-Acid",
+    capacity: "200Ah",
+    voltage: "12V",
+    pricePerUnit: 14000,
+    unit: "Nos",
+    efficiency: 80.0,
+    warrantyYears: BigInt(3),
+    isActive: true,
+  },
+  {
+    id: BigInt(48),
+    category: "Battery",
+    brand: "Genus",
+    productType: "Flat Plate",
+    capacity: "100Ah",
+    voltage: "12V",
+    pricePerUnit: 8000,
+    unit: "Nos",
+    efficiency: 75.0,
+    warrantyYears: BigInt(2),
+    isActive: true,
+  },
+  {
+    id: BigInt(49),
+    category: "Battery",
+    brand: "Waaree Energy",
+    productType: "LiFePO4",
+    capacity: "100Ah",
+    voltage: "48V",
+    pricePerUnit: 28000,
+    unit: "Nos",
+    efficiency: 96.0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(50),
+    category: "Battery",
+    brand: "Shoto",
+    productType: "LiFePO4",
+    capacity: "100Ah",
+    voltage: "48V",
+    pricePerUnit: 26000,
+    unit: "Nos",
+    efficiency: 96.0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(51),
+    category: "Battery",
+    brand: "Pylontech",
+    productType: "LiFePO4",
+    capacity: "74Ah",
+    voltage: "48V",
+    pricePerUnit: 30000,
+    unit: "Nos",
+    efficiency: 96.5,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(52),
+    category: "Battery",
+    brand: "BYD",
+    productType: "Lithium-Ion",
+    capacity: "100Ah",
+    voltage: "48V",
+    pricePerUnit: 32000,
+    unit: "Nos",
+    efficiency: 95.0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(53),
+    category: "Battery",
+    brand: "Generic",
+    productType: "Lead-Acid",
+    capacity: "150Ah",
+    voltage: "24V",
+    pricePerUnit: 22000,
+    unit: "Nos",
+    efficiency: 78.0,
+    warrantyYears: BigInt(2),
+    isActive: true,
+  },
+  // Cables
+  {
+    id: BigInt(54),
+    category: "Cable",
+    brand: "Havells",
+    productType: "DC Solar Cable",
+    capacity: "4sqmm",
+    voltage: "1000V DC",
+    pricePerUnit: 28,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(55),
+    category: "Cable",
+    brand: "Havells",
+    productType: "DC Solar Cable",
+    capacity: "6sqmm",
+    voltage: "1000V DC",
+    pricePerUnit: 38,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(56),
+    category: "Cable",
+    brand: "Havells",
+    productType: "AC Power Cable",
+    capacity: "4sqmm",
+    voltage: "1100V AC",
+    pricePerUnit: 30,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(57),
+    category: "Cable",
+    brand: "Havells",
+    productType: "AC Power Cable",
+    capacity: "6sqmm",
+    voltage: "1100V AC",
+    pricePerUnit: 42,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(58),
+    category: "Cable",
+    brand: "Havells",
+    productType: "Earthing Cable",
+    capacity: "16sqmm",
+    voltage: "N/A",
+    pricePerUnit: 48,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(59),
+    category: "Cable",
+    brand: "Polycab",
+    productType: "DC Solar Cable",
+    capacity: "6sqmm",
+    voltage: "1000V DC",
+    pricePerUnit: 36,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(60),
+    category: "Cable",
+    brand: "Polycab",
+    productType: "AC Power Cable",
+    capacity: "4sqmm",
+    voltage: "1100V AC",
+    pricePerUnit: 28,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(61),
+    category: "Cable",
+    brand: "Polycab",
+    productType: "AC Power Cable",
+    capacity: "10sqmm",
+    voltage: "1100V AC",
+    pricePerUnit: 65,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(62),
+    category: "Cable",
+    brand: "Polycab",
+    productType: "Battery Interconnect",
+    capacity: "50sqmm",
+    voltage: "N/A",
+    pricePerUnit: 180,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(63),
+    category: "Cable",
+    brand: "KEI",
+    productType: "DC Solar Cable",
+    capacity: "6sqmm",
+    voltage: "1000V DC",
+    pricePerUnit: 37,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(64),
+    category: "Cable",
+    brand: "KEI",
+    productType: "AC Power Cable",
+    capacity: "6sqmm",
+    voltage: "1100V AC",
+    pricePerUnit: 40,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(65),
+    category: "Cable",
+    brand: "KEI",
+    productType: "Earthing Cable",
+    capacity: "25sqmm",
+    voltage: "N/A",
+    pricePerUnit: 75,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(66),
+    category: "Cable",
+    brand: "Finolex",
+    productType: "AC Power Cable",
+    capacity: "4sqmm",
+    voltage: "1100V AC",
+    pricePerUnit: 27,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(67),
+    category: "Cable",
+    brand: "Lapp",
+    productType: "DC Solar Cable",
+    capacity: "6sqmm",
+    voltage: "1500V DC",
+    pricePerUnit: 55,
+    unit: "Mtr",
+    efficiency: 0,
+    warrantyYears: BigInt(25),
+    isActive: true,
+  },
+  // Structure
+  {
+    id: BigInt(68),
+    category: "Structure",
+    brand: "Local Fabricator",
+    productType: "GI Structure",
+    capacity: "Rooftop RCC",
+    voltage: "N/A",
+    pricePerUnit: 3800,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(69),
+    category: "Structure",
+    brand: "Local Fabricator",
+    productType: "MS Structure",
+    capacity: "Rooftop RCC",
+    voltage: "N/A",
+    pricePerUnit: 4200,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(70),
+    category: "Structure",
+    brand: "Local Fabricator",
+    productType: "Aluminium Structure",
+    capacity: "Rooftop RCC",
+    voltage: "N/A",
+    pricePerUnit: 5500,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(71),
+    category: "Structure",
+    brand: "Local Fabricator",
+    productType: "GI Roof Hook Structure",
+    capacity: "Sheet Metal Roof",
+    voltage: "N/A",
+    pricePerUnit: 3500,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(72),
+    category: "Structure",
+    brand: "Local Fabricator",
+    productType: "MS Ground Mount",
+    capacity: "Ground Mount",
+    voltage: "N/A",
+    pricePerUnit: 6500,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(73),
+    category: "Structure",
+    brand: "Local Fabricator",
+    productType: "GI Ground Mount",
+    capacity: "Ground Mount",
+    voltage: "N/A",
+    pricePerUnit: 6000,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(74),
+    category: "Structure",
+    brand: "Local Fabricator",
+    productType: "Elevated MS Structure",
+    capacity: "Elevated",
+    voltage: "N/A",
+    pricePerUnit: 8500,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(75),
+    category: "Structure",
+    brand: "Local Fabricator",
+    productType: "Carport Structure",
+    capacity: "Carport",
+    voltage: "N/A",
+    pricePerUnit: 12000,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(76),
+    category: "Structure",
+    brand: "Local Fabricator",
+    productType: "Agricultural Land Mount",
+    capacity: "Agricultural",
+    voltage: "N/A",
+    pricePerUnit: 7500,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(5),
+    isActive: true,
+  },
+  {
+    id: BigInt(77),
+    category: "Structure",
+    brand: "Enerack",
+    productType: "Aluminium Rooftop",
+    capacity: "Rooftop RCC",
+    voltage: "N/A",
+    pricePerUnit: 6000,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(78),
+    category: "Structure",
+    brand: "Enerack",
+    productType: "Ground Mount Tracker",
+    capacity: "Ground Mount",
+    voltage: "N/A",
+    pricePerUnit: 14000,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+  {
+    id: BigInt(79),
+    category: "Structure",
+    brand: "Schletter",
+    productType: "Aluminium Rooftop",
+    capacity: "Rooftop RCC",
+    voltage: "N/A",
+    pricePerUnit: 7000,
+    unit: "Nos",
+    efficiency: 0,
+    warrantyYears: BigInt(10),
+    isActive: true,
+  },
+];
+
+// Category → productId field mapping
+const CATEGORY_TO_PRODUCT_FIELD: Record<
+  string,
+  keyof typeof EMPTY_PRODUCT_IDS
+> = {
+  "Solar Panel": "panelId",
+  Inverter: "inverterId",
+  Battery: "batteryId",
+  Cable: "cableId",
+  Structure: "structureId",
+};
+const EMPTY_PRODUCT_IDS = {
+  panelId: null as bigint | null,
+  inverterId: null as bigint | null,
+  batteryId: null as bigint | null,
+  cableId: null as bigint | null,
+  structureId: null as bigint | null,
+};
+
+// Category display config for Brand Reference
+const BRAND_REF_CATEGORIES = [
+  {
+    id: "Solar Panel",
+    label: "Solar Panel",
+    color: "bg-amber-50 border-amber-200",
+    chipColor: "bg-amber-100 text-amber-800 border-amber-300",
+  },
+  {
+    id: "Inverter",
+    label: "Inverter",
+    color: "bg-blue-50 border-blue-200",
+    chipColor: "bg-blue-100 text-blue-800 border-blue-300",
+  },
+  {
+    id: "Battery",
+    label: "Battery",
+    color: "bg-green-50 border-green-200",
+    chipColor: "bg-green-100 text-green-800 border-green-300",
+  },
+  {
+    id: "Cable",
+    label: "Cable",
+    color: "bg-orange-50 border-orange-200",
+    chipColor: "bg-orange-100 text-orange-800 border-orange-300",
+  },
+  {
+    id: "Structure",
+    label: "Mounting Structure",
+    color: "bg-purple-50 border-purple-200",
+    chipColor: "bg-purple-100 text-purple-800 border-purple-300",
+  },
+];
 
 const STEPS = [
   { label: "Basic Info", icon: FileText },
@@ -171,11 +1275,10 @@ export function ProjectWizard({
     {},
   );
 
-  // Brand selection
-  const { data: brands } = useBrands();
-  const [selectedBrands, setSelectedBrands] = useState<Record<string, string>>(
-    {},
-  );
+  // Brand Reference cascaded spec state: category → { brand, type, capacity }
+  const [selectedBrandSpec, setSelectedBrandSpec] = useState<
+    Record<string, { brand: string; type: string; capacity: string }>
+  >({});
 
   // Product specification selection from Product Master
   const { data: allProducts } = useProductMaster();
@@ -483,55 +1586,6 @@ export function ProjectWizard({
       },
       {} as Record<string, typeof moqItems>,
     ) ?? {};
-
-  // Merge static market brands with any backend brands
-  const mergedBrandsByCategory = (() => {
-    const staticByCategory = getBrandsByCategory();
-    const backendByCategory =
-      brands?.reduce(
-        (acc, brand) => {
-          if (!acc[brand.category]) acc[brand.category] = [];
-          acc[brand.category].push(brand);
-          return acc;
-        },
-        {} as Record<string, typeof brands>,
-      ) ?? {};
-
-    const result: Record<
-      string,
-      Array<{ name: string; isActive: boolean }>
-    > = {};
-    for (const [cat, staticBrands] of Object.entries(staticByCategory)) {
-      result[cat] = staticBrands.map((sb) => {
-        const backendMatch = backendByCategory[cat]?.find(
-          (bb) => bb.name.toLowerCase() === sb.name.toLowerCase(),
-        );
-        return {
-          name: sb.name,
-          isActive: backendMatch ? backendMatch.isActive : true,
-        };
-      });
-      if (backendByCategory[cat]) {
-        for (const bb of backendByCategory[cat] ?? []) {
-          const alreadyIncluded = result[cat].some(
-            (r) => r.name.toLowerCase() === bb.name.toLowerCase(),
-          );
-          if (!alreadyIncluded) {
-            result[cat].push({ name: bb.name, isActive: bb.isActive });
-          }
-        }
-      }
-    }
-    for (const [cat, bBrands] of Object.entries(backendByCategory)) {
-      if (!result[cat]) {
-        result[cat] = (bBrands ?? []).map((bb) => ({
-          name: bb.name,
-          isActive: bb.isActive,
-        }));
-      }
-    }
-    return result;
-  })();
 
   const canProceedStep1 = clientName.trim().length > 0;
   const canProceedLoadInput =
@@ -967,6 +2021,22 @@ export function ProjectWizard({
                   )}
                 </TabsContent>
               </Tabs>
+
+              {/* AI Load Suggestion Card */}
+              {systemSizeKW > 0 && (
+                <div className="mt-4">
+                  <AILoadSuggestionCard
+                    systemKW={systemSizeKW}
+                    systemType={systemType}
+                    backupHours={
+                      systemType !== Variant_hybrid_offGrid_onGrid.onGrid
+                        ? 4
+                        : 0
+                    }
+                    tariff={Number.parseFloat(tariff || "8.5")}
+                  />
+                </div>
+              )}
 
               {/* Generate MOQ button inside load card */}
               <div className="mt-4 pt-4 border-t border-border">
@@ -1431,65 +2501,322 @@ export function ProjectWizard({
             </Card>
           )}
 
-          {/* Brand Selection reference grid */}
+          {/* Brand Reference — cascaded Brand → Specification/Type → Size/Capacity */}
           {moqGenerated && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Battery className="h-4 w-4 text-navy" />
                   Brand Reference
-                  <span className="ml-auto text-xs font-normal text-muted-foreground">
-                    {MARKET_BRANDS.length} brands available
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    — Select brand, type &amp; size to auto-reprice MOQ
                   </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {Object.entries(mergedBrandsByCategory).map(
-                  ([category, categoryBrands]) => (
-                    <div key={category}>
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-navy">
-                        {category}
-                      </Label>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {categoryBrands
-                          .filter((b) => b.isActive)
-                          .map((brand) => (
+              <CardContent className="space-y-5">
+                {(() => {
+                  // Merge: prefer backend products if available, else fall back to static
+                  const productList: StaticProduct[] =
+                    (allProducts?.length ?? 0) > 0
+                      ? (allProducts as StaticProduct[])
+                      : STATIC_PRODUCTS;
+
+                  return BRAND_REF_CATEGORIES.map((catConfig) => {
+                    const catProducts = productList.filter(
+                      (p) => p.category === catConfig.id && p.isActive,
+                    );
+                    if (catProducts.length === 0) return null;
+
+                    // Unique brands available for this category (from product list)
+                    const availableBrands = Array.from(
+                      new Set(catProducts.map((p) => p.brand)),
+                    ).sort();
+
+                    const spec = selectedBrandSpec[catConfig.id] ?? {
+                      brand: "",
+                      type: "",
+                      capacity: "",
+                    };
+
+                    // Types available for selected brand
+                    const availableTypes = spec.brand
+                      ? Array.from(
+                          new Set(
+                            catProducts
+                              .filter((p) => p.brand === spec.brand)
+                              .map((p) => p.productType),
+                          ),
+                        ).sort()
+                      : [];
+
+                    // Capacities available for selected brand + type
+                    const availableCapacities =
+                      spec.brand && spec.type
+                        ? catProducts.filter(
+                            (p) =>
+                              p.brand === spec.brand &&
+                              p.productType === spec.type,
+                          )
+                        : [];
+
+                    // Currently matched product (for chip display)
+                    const matchedProduct =
+                      spec.brand && spec.type && spec.capacity
+                        ? catProducts.find(
+                            (p) =>
+                              p.brand === spec.brand &&
+                              p.productType === spec.type &&
+                              p.capacity === spec.capacity,
+                          )
+                        : null;
+
+                    const productField =
+                      CATEGORY_TO_PRODUCT_FIELD[catConfig.id];
+                    const isSelected =
+                      productField &&
+                      selectedProductIds[productField] !== null &&
+                      matchedProduct !== null &&
+                      matchedProduct !== undefined &&
+                      selectedProductIds[productField] === matchedProduct.id;
+
+                    return (
+                      <div
+                        key={catConfig.id}
+                        data-ocid={`brand_ref.${catConfig.id.toLowerCase().replace(/\s+/g, "_")}.panel`}
+                        className={`rounded-lg border p-3 transition-all ${isSelected ? `${catConfig.color} border-opacity-80` : "border-border bg-card"}`}
+                      >
+                        {/* Category label */}
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="text-xs font-semibold uppercase tracking-wider text-navy">
+                            {catConfig.label}
+                          </Label>
+                          {isSelected && matchedProduct && (
+                            <Badge
+                              className={`${catConfig.chipColor} text-xs border`}
+                            >
+                              ✓ Applied
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Brand pills */}
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                          {availableBrands.map((brandName) => (
                             <button
                               type="button"
-                              key={brand.name}
-                              onClick={() =>
-                                setSelectedBrands((prev) => ({
+                              key={brandName}
+                              data-ocid="brand_ref.brand.button"
+                              onClick={() => {
+                                // Selecting a brand resets type + capacity for this category
+                                setSelectedBrandSpec((prev) => ({
                                   ...prev,
-                                  [category]: brand.name,
-                                }))
-                              }
-                              className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-all ${
-                                selectedBrands[category] === brand.name
+                                  [catConfig.id]: {
+                                    brand: brandName,
+                                    type: "",
+                                    capacity: "",
+                                  },
+                                }));
+                                // Clear product ID for this category when brand changes
+                                if (productField) {
+                                  setSelectedProductIds((prev) => ({
+                                    ...prev,
+                                    [productField]: null,
+                                  }));
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-all ${
+                                spec.brand === brandName
                                   ? "bg-navy text-white border-navy"
-                                  : "bg-secondary text-secondary-foreground border-border hover:border-solar/60 hover:bg-solar/10"
+                                  : "bg-secondary text-secondary-foreground border-border hover:border-navy/40 hover:bg-navy/5"
                               }`}
                             >
-                              {brand.name}
+                              {brandName}
                             </button>
                           ))}
+                        </div>
+
+                        {/* Type / Specification selector — shown only after brand is selected */}
+                        {spec.brand && (
+                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-xs text-muted-foreground mb-1 block">
+                                Specification / Type
+                              </Label>
+                              <Select
+                                value={spec.type}
+                                onValueChange={(val) => {
+                                  setSelectedBrandSpec((prev) => ({
+                                    ...prev,
+                                    [catConfig.id]: {
+                                      ...prev[catConfig.id],
+                                      type: val,
+                                      capacity: "", // reset capacity when type changes
+                                    },
+                                  }));
+                                  // Clear product ID until capacity is also chosen
+                                  if (productField) {
+                                    setSelectedProductIds((prev) => ({
+                                      ...prev,
+                                      [productField]: null,
+                                    }));
+                                  }
+                                }}
+                              >
+                                <SelectTrigger
+                                  className="h-8 text-xs"
+                                  data-ocid="brand_ref.type.select"
+                                >
+                                  <SelectValue placeholder="Select type..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableTypes.map((t) => (
+                                    <SelectItem
+                                      key={t}
+                                      value={t}
+                                      className="text-xs"
+                                    >
+                                      {t}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Capacity / Size selector — shown only after type is selected */}
+                            {spec.type && (
+                              <div>
+                                <Label className="text-xs text-muted-foreground mb-1 block">
+                                  Size / Capacity
+                                </Label>
+                                <Select
+                                  value={spec.capacity}
+                                  onValueChange={(val) => {
+                                    setSelectedBrandSpec((prev) => ({
+                                      ...prev,
+                                      [catConfig.id]: {
+                                        ...prev[catConfig.id],
+                                        capacity: val,
+                                      },
+                                    }));
+                                    // Find matching product and set its ID to trigger MOQ repricing
+                                    const product = catProducts.find(
+                                      (p) =>
+                                        p.brand === spec.brand &&
+                                        p.productType === spec.type &&
+                                        p.capacity === val,
+                                    );
+                                    if (product && productField) {
+                                      setSelectedProductIds((prev) => ({
+                                        ...prev,
+                                        [productField]: product.id,
+                                      }));
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger
+                                    className="h-8 text-xs"
+                                    data-ocid="brand_ref.capacity.select"
+                                  >
+                                    <SelectValue placeholder="Select size..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableCapacities.map((p) => (
+                                      <SelectItem
+                                        key={p.id.toString()}
+                                        value={p.capacity}
+                                        className="text-xs"
+                                      >
+                                        {p.capacity}
+                                        {p.voltage && p.voltage !== "N/A"
+                                          ? ` | ${p.voltage}`
+                                          : ""}
+                                        {" — "}₹
+                                        {p.pricePerUnit.toLocaleString()}/
+                                        {p.unit}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Selected spec summary chip */}
+                        {matchedProduct && (
+                          <div
+                            className={`mt-2.5 px-3 py-2 rounded-md ${catConfig.color} border flex items-center justify-between gap-2 text-xs`}
+                          >
+                            <span className="font-medium text-navy truncate">
+                              {matchedProduct.brand} ·{" "}
+                              {matchedProduct.productType} ·{" "}
+                              {matchedProduct.capacity}
+                              {matchedProduct.voltage &&
+                              matchedProduct.voltage !== "N/A"
+                                ? ` | ${matchedProduct.voltage}`
+                                : ""}
+                              {matchedProduct.efficiency > 0
+                                ? ` | Eff: ${matchedProduct.efficiency}%`
+                                : ""}
+                              {" | Warranty: "}
+                              {Number(matchedProduct.warrantyYears)}yr
+                            </span>
+                            <span className="font-bold text-navy whitespace-nowrap">
+                              ₹{matchedProduct.pricePerUnit.toLocaleString()}/
+                              {matchedProduct.unit}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ),
+                    );
+                  });
+                })()}
+
+                {/* AI Product Recommendations */}
+                {systemSizeKW > 0 && (
+                  <AIProductRecommendationCard
+                    systemKW={systemSizeKW}
+                    systemType={systemType}
+                    products={
+                      (allProducts?.length ?? 0) > 0
+                        ? allProducts!
+                        : STATIC_PRODUCTS
+                    }
+                    onSelectProduct={(category, productId) => {
+                      const field = CATEGORY_TO_PRODUCT_FIELD[category];
+                      if (field) {
+                        setSelectedProductIds((prev) => ({
+                          ...prev,
+                          [field]: productId,
+                        }));
+                      }
+                    }}
+                  />
                 )}
-                {Object.keys(selectedBrands).length > 0 && (
-                  <div className="p-3 rounded-lg bg-secondary/50 border border-border">
-                    <p className="text-xs font-semibold text-muted-foreground mb-2">
-                      Selected Brands
+
+                {/* Summary of all selected specs */}
+                {Object.values(selectedBrandSpec).some(
+                  (s) => s.brand && s.type && s.capacity,
+                ) && (
+                  <div className="p-3 rounded-lg bg-navy/5 border border-navy/15">
+                    <p className="text-xs font-semibold text-navy mb-2">
+                      Selected Specifications
                     </p>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(selectedBrands).map(([cat, name]) => (
-                        <Badge
-                          key={cat}
-                          className="bg-solar/25 text-solar-dark text-xs border border-solar/40"
-                        >
-                          {cat}: {name}
-                        </Badge>
-                      ))}
+                    <div className="flex flex-wrap gap-1.5">
+                      {BRAND_REF_CATEGORIES.map((catConfig) => {
+                        const spec = selectedBrandSpec[catConfig.id];
+                        if (!spec?.brand || !spec.type || !spec.capacity)
+                          return null;
+                        return (
+                          <Badge
+                            key={catConfig.id}
+                            className={`${catConfig.chipColor} text-xs border`}
+                          >
+                            {catConfig.label}: {spec.brand} {spec.type}{" "}
+                            {spec.capacity}
+                          </Badge>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
