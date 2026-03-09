@@ -1,6 +1,6 @@
 {
-  "name": "Solar EPC Pro",
-  "short_name": "SolarEPC",
+  "name": "Origin Solar EPC Pro",
+  "short_name": "OriginSolar",
   "description": "Intelligent Solar System Design, Estimation & Execution Platform",
   "start_url": "/",
   "display": "standalone",

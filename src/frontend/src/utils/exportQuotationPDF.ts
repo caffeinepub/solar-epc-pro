@@ -252,7 +252,7 @@ export async function exportQuotationPDF(
   </div>
 
   <div class="footer">
-    Solar EPC Pro | ${companyProfile.companyName || "Solar EPC Company"} | Confidential
+    Origin Solar EPC Pro | ${companyProfile.companyName || "Solar EPC Company"} | Confidential
   </div>
 </body>
 </html>`;

@@ -1297,7 +1297,7 @@ export function ProjectWizard({
   });
 
   // Quotation fields
-  const [companyName, setCompanyName] = useState("Solar EPC Pro");
+  const [companyName, setCompanyName] = useState("Origin Solar EPC Pro");
   const [gstPercent, setGstPercent] = useState("18");
   const [subsidyAmount, setSubsidyAmount] = useState("0");
 

@@ -32,7 +32,7 @@ export function exportMOQToExcel(
 
   // Build CSV rows
   const rows: string[][] = [
-    ["Solar EPC Pro - Material Order Quantity (MOQ)"],
+    ["Origin Solar EPC Pro - Material Order Quantity (MOQ)"],
     [],
     ["Project Details"],
     ["Client Name", project.clientName],

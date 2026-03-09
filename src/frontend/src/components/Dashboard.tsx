@@ -124,7 +124,7 @@ export function Dashboard({
             Operations Dashboard
           </h1>
           <p className="text-sm text-muted-foreground">
-            Solar EPC Pro — Command Center
+            Origin Solar EPC Pro — Command Center
           </p>
         </div>
       </div>

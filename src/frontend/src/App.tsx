@@ -173,7 +173,7 @@ function Sidebar({
         {!collapsed && (
           <div className="min-w-0">
             <p className="text-sm font-bold text-white leading-tight truncate font-display">
-              Solar EPC Pro
+              Origin Solar EPC Pro
             </p>
             <p className="text-xs text-white/50 truncate">v2.0 Platform</p>
           </div>
@@ -497,7 +497,7 @@ function PWAInstallBanner() {
     >
       <Sun className="h-4 w-4 flex-shrink-0 text-navy" />
       <p className="flex-1 text-xs font-medium leading-tight">
-        Install Solar EPC Pro on your home screen for quick access
+        Install Origin Solar EPC Pro on your home screen for quick access
       </p>
       <button
         type="button"
@@ -586,7 +586,7 @@ function AppContent() {
           <div className="w-14 h-14 rounded-2xl bg-solar flex items-center justify-center mx-auto animate-pulse shadow-yellow-glow">
             <Sun className="h-7 w-7 text-navy" />
           </div>
-          <p className="text-base font-semibold">Solar EPC Pro</p>
+          <p className="text-base font-semibold">Origin Solar EPC Pro</p>
           <p className="text-sm text-muted-foreground">
             Connecting to backend...
           </p>
@@ -785,7 +785,7 @@ function AppInner() {
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-solar shadow-yellow-glow border border-solar/50">
             <Sun className="h-3.5 w-3.5 text-navy" />
             <span className="text-xs font-bold text-navy hidden sm:block">
-              Solar EPC Pro
+              Origin Solar EPC Pro
             </span>
           </div>
         </header>
